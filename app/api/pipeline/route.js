@@ -33,7 +33,8 @@ export async function GET() {
     );
   }
   try {
-    const all = await fetchAllCreators();
+    // "Screened" rows are the AI-rejection ledger — dedupe data, not pipeline data
+    const all = (await fetchAllCreators()).filter((c) => c.status !== "Screened");
 
     const counts = {};
     for (const c of all) {

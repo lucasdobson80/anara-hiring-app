@@ -11,10 +11,19 @@ const YIELD_LOW = 0.03;
 const YIELD_HIGH = 0.08;
 const REVIEWS_PER_DAY = 25; // Lucas's target review pace (20-30/day)
 
-// The yield forecast only holds for study-adjacent hashtags — warn when the
-// set drifts off-ICP (a generic run can yield literally zero candidates).
-const ICP_HASHTAG_HINT = /stud|grad|phd|thesis|academ|school|student|uni|college|exam|revision|nurs|med|law|productiv|note|learn/i;
+// Anara recruits skilled creators beyond the study niche, but hashtags that
+// suggest faceless/meme/edit content (or audiences far from students and
+// young professionals) still tank the yield — nudge before spend.
+const ICP_HASHTAG_HINT = /stud|grad|phd|thesis|academ|school|student|uni|college|exam|revision|nurs|med|law|productiv|note|learn|lifestyle|tech|career|vlog|grwm|dayin|storytime|selfimprove|routine|desk/i;
 const offIcpShare = (tags) => tags.length === 0 ? 0 : tags.filter((t) => !ICP_HASHTAG_HINT.test(t)).length / tags.length;
+
+// Client-side run memory (single-user app): which runs are archived, which
+// were imported and what they yielded, and which we launched and should
+// auto-import on completion.
+const store = {
+  read(key) { try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; } },
+  write(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} },
+};
 
 const fmtUsd = (n) => (n == null ? "–" : `$${n.toFixed(2)}`);
 const fmtWhen = (iso) => {
@@ -37,7 +46,26 @@ export default function SourceTab({ onImported }) {
   const [launching, setLaunching] = useState(false);
   const [importing, setImporting] = useState(null); // runId
   const [importResult, setImportResult] = useState(null);
+  const [archived, setArchived] = useState({});
+  const [imports, setImports] = useState({});
+  const [showArchived, setShowArchived] = useState(false);
+  const launchedRef = useRef({});
   const pollRef = useRef(null);
+
+  useEffect(() => {
+    setArchived(store.read("cd_runs_archived"));
+    setImports(store.read("cd_runs_imports"));
+    launchedRef.current = store.read("cd_runs_launched");
+  }, []);
+
+  const toggleArchived = (runId) => {
+    setArchived((a) => {
+      const next = { ...a };
+      if (next[runId]) delete next[runId]; else next[runId] = true;
+      store.write("cd_runs_archived", next);
+      return next;
+    });
+  };
 
   const loadStatus = useCallback(async () => {
     try {
@@ -102,13 +130,16 @@ export default function SourceTab({ onImported }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      // Remember we launched it so it auto-imports the moment it succeeds
+      launchedRef.current = { ...launchedRef.current, [data.id]: true };
+      store.write("cd_runs_launched", launchedRef.current);
       await loadStatus();
     } catch (e) {
       setError("Couldn't launch the run: " + e.message);
     } finally { setLaunching(false); }
   };
 
-  const importRun = async (runId) => {
+  const importRun = useCallback(async (runId) => {
     setImporting(runId); setImportResult(null);
     try {
       const res = await fetch("/api/source/import", {
@@ -118,11 +149,27 @@ export default function SourceTab({ onImported }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       setImportResult(data);
+      setImports((im) => {
+        const next = { ...im, [runId]: { inserted: data.inserted, screened: data.screened, alreadyKnown: data.alreadyKnown, videosFetched: data.videosFetched, at: Date.now() } };
+        store.write("cd_runs_imports", next);
+        return next;
+      });
+      delete launchedRef.current[runId];
+      store.write("cd_runs_launched", launchedRef.current);
       onImported?.();
     } catch (e) {
       setImportResult({ error: e.message });
     } finally { setImporting(null); }
-  };
+  }, [days, onImported]);
+
+  // Auto-import: a run launched from the app that just reached SUCCEEDED
+  useEffect(() => {
+    if (importing) return;
+    const ready = status?.runs?.find(
+      (r) => r.status === "SUCCEEDED" && launchedRef.current[r.id] && !imports[r.id]
+    );
+    if (ready) importRun(ready.id);
+  }, [status, imports, importing, importRun]);
 
   if (!status && !error) return <div className="empty">Loading sourcing status…</div>;
 
@@ -213,8 +260,9 @@ export default function SourceTab({ onImported }) {
           </p>
           {offIcpShare(parsedHashtags) > 0.5 && (
             <p className="off-icp-warn">
-              ⚠ Most of these hashtags look outside the study/academia niche — the forecast above won&apos;t hold,
-              and yield could be near zero. Generic tags (lifestyle, travel, content…) scrape the wrong crowd.
+              ⚠ Most of these hashtags don&apos;t obviously point at Anara&apos;s audiences (study, students,
+              lifestyle, tech, career) or on-camera creators — the forecast may not hold. Very generic tags
+              tend to surface faceless meme/edit accounts that score low.
             </p>
           )}
         </div>
@@ -229,20 +277,57 @@ export default function SourceTab({ onImported }) {
         </div>
       </div>
 
-      <div className="eyebrow" style={{ marginBottom: 8 }}>RECENT RUNS</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <div className="eyebrow">RECENT RUNS</div>
+        {Object.keys(archived).length > 0 && (
+          <button className="chip" onClick={() => setShowArchived((s) => !s)}>
+            {showArchived ? "Hide archived" : `Archived (${Object.keys(archived).length})`}
+          </button>
+        )}
+      </div>
       {(!status.runs || status.runs.length === 0) && <p className="soft" style={{ fontSize: 13.5 }}>No runs yet.</p>}
       <div className="runs">
-        {status.runs?.map((r) => (
-          <div key={r.id} className="run-row">
-            <span className={"badge run-" + r.status.toLowerCase()}>{r.status}</span>
-            <span className="mono soft run-meta">{fmtWhen(r.startedAt)} · {r.usageUsd != null ? fmtUsd(r.usageUsd) : "cost pending"}</span>
-            {r.status === "SUCCEEDED" && (
-              <button className="ghost small" onClick={() => importRun(r.id)} disabled={importing !== null}>
-                {importing === r.id ? "Scoring… (takes a minute)" : "Import & score"}
-              </button>
-            )}
-          </div>
-        ))}
+        {status.runs?.filter((r) => showArchived || !archived[r.id]).map((r) => {
+          const imp = imports[r.id];
+          const isImporting = importing === r.id;
+          const wasLaunchedHere = Boolean(launchedRef.current[r.id]);
+          return (
+            <div key={r.id} className={"run-card" + (archived[r.id] ? " dim" : "")}>
+              <div className="run-line">
+                <span className={"badge run-" + r.status.toLowerCase()}>{r.status}</span>
+                <span className="mono soft">{fmtWhen(r.startedAt)}</span>
+                <span className="run-tags" title={r.hashtags.join(", ")}>
+                  {r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "—"}
+                </span>
+                <span className="mono soft run-nums">
+                  {r.videos != null ? `${r.videos} videos` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
+                </span>
+                <button className="ghost tiny" title={archived[r.id] ? "Unarchive" : "Archive"} onClick={() => toggleArchived(r.id)}>
+                  {archived[r.id] ? "↩" : "✕"}
+                </button>
+              </div>
+              <div className="run-line2">
+                {isImporting && <span className="soft run-summary">Scoring… takes a minute or two</span>}
+                {!isImporting && imp && (
+                  <span className="run-summary ok">
+                    ✓ imported → <b>{imp.inserted} added to Review</b> · {imp.screened} screened out · {imp.alreadyKnown} already known
+                  </span>
+                )}
+                {!isImporting && !imp && r.status === "SUCCEEDED" && (
+                  <span className="soft run-summary">{wasLaunchedHere ? "Waiting to auto-import…" : "Not imported yet"}</span>
+                )}
+                {!isImporting && !imp && r.status !== "SUCCEEDED" && (
+                  <span className="soft run-summary">{r.status === "RUNNING" || r.status === "READY" ? "Scraping… auto-imports when done" : "Run did not finish"}</span>
+                )}
+                {r.status === "SUCCEEDED" && !isImporting && (
+                  <button className="ghost small" onClick={() => importRun(r.id)} disabled={importing !== null}>
+                    {imp ? "Re-import" : "Import & score"}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {importResult && !importResult.error && (
@@ -250,8 +335,7 @@ export default function SourceTab({ onImported }) {
           <div className="banner" style={{ marginTop: 14, borderRadius: 10 }}>
             Imported: {importResult.inserted} new candidates added to the queue ·{" "}
             {importResult.videosFetched} videos → {importResult.uniqueCreators} creators ·{" "}
-            {importResult.alreadyKnown} already in the database · {importResult.hardRejected} hard-rejected ·{" "}
-            {importResult.belowThreshold} below threshold
+            {importResult.alreadyKnown} already known · {importResult.screened} screened out
             {importResult.insertFailures?.length > 0 && ` · ${importResult.insertFailures.length} failed to insert`}
           </div>
           {importResult.inserted === 0 && importResult.topMisses?.length > 0 && (
@@ -265,8 +349,9 @@ export default function SourceTab({ onImported }) {
                 </div>
               ))}
               <p className="soft" style={{ fontSize: 12.5, margin: "8px 0 0" }}>
-                When even the best scores are far below 73, the hashtags usually pointed outside the
-                study/academia niche — try a run closer to the proven set.
+                When even the best scores are far below 73, the run mostly hit faceless or low-engagement
+                accounts — aim hashtags at creators who appear on camera (study, student life, lifestyle,
+                tech, day-in-my-life…).
               </p>
             </div>
           )}
@@ -276,9 +361,10 @@ export default function SourceTab({ onImported }) {
         <div className="banner bad" style={{ marginTop: 14, borderRadius: 10 }}>Import failed: {importResult.error}</div>
       )}
       <p className="hint">
-        A run takes a few minutes on Apify&apos;s side — this list refreshes itself while one is going. When it shows
-        SUCCEEDED, hit Import &amp; score: candidates are filtered, scored against the ICP, deduped against the whole
-        database, and anyone scoring {`≥73`} lands in Review as New.
+        Runs you launch here import themselves automatically when the scrape finishes (keep the tab open) —
+        candidates are filtered, scored, deduped, and anyone at 73+ lands in Review. Everyone scored below the
+        bar is recorded as &quot;Screened&quot; in Notion, so no creator is ever scored twice. ✕ archives a run
+        from this list.
       </p>
     </div>
   );

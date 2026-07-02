@@ -46,7 +46,7 @@ export async function POST(request) {
     );
     const fresh = candidates.filter((c) => !known.has(c.handle.toLowerCase().replace(/^@/, "")));
 
-    let scored = 0, inserted = 0, hardRejected = 0, belowThreshold = 0;
+    let scored = 0, inserted = 0, hardRejected = 0, belowThreshold = 0, screened = 0;
     const insertFailures = [];
     const misses = [];
     if (fresh.length > 0) {
@@ -55,15 +55,20 @@ export async function POST(request) {
         const s = results.get(c.handle.toLowerCase());
         if (!s) continue;
         scored += 1;
-        if (s.hard_reject) { hardRejected += 1; continue; }
-        if (s.score < THRESHOLD) {
+        const rejected = s.hard_reject || s.score < THRESHOLD;
+        if (s.hard_reject) hardRejected += 1;
+        else if (s.score < THRESHOLD) {
           belowThreshold += 1;
           misses.push({ handle: c.handle, score: s.score, rationale: s.rationale });
-          continue;
         }
+        const rationale = s.hard_reject ? `HARD REJECT: ${s.reject_reason || s.rationale}` : s.rationale;
         try {
-          await createCreator({ ...c, score: s.score, rationale: s.rationale, niche: s.niche });
-          inserted += 1;
+          await createCreator(
+            { ...c, score: s.score, rationale, niche: s.niche },
+            rejected ? "Screened" : "New"
+          );
+          if (rejected) screened += 1;
+          else inserted += 1;
         } catch (e) {
           insertFailures.push({ handle: c.handle, message: e.message });
         }
@@ -82,6 +87,7 @@ export async function POST(request) {
       hardRejected,
       belowThreshold,
       inserted,
+      screened,
       insertFailures,
       topMisses: misses.slice(0, 5),
     });
