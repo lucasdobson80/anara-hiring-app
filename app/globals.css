@@ -83,6 +83,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field span { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #98A0B3; }
 .launch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.forecast { background: #14171E; border: 1px solid #272D3A; border-radius: 12px; padding: 12px 15px; margin-top: 16px; }
+.forecast-line { font-size: 14.5px; margin-top: 6px; line-height: 1.5; }
+.forecast-line b { color: #FFE566; }
 .runs { display: flex; flex-direction: column; gap: 7px; }
 .run-row { display: flex; align-items: center; gap: 12px; background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 11px 14px; }
 .run-meta { flex: 1; font-size: 12px; }

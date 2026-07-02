@@ -4,6 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 const DEFAULT_HASHTAGS = "studytok, studytips, studywithme, gradschool, phdlife, gradstudent, thesis, academia";
 
+// Candidate-yield forecast, calibrated on real imports (Jul 2026: ~4-5% of
+// scraped videos survive pre-filters, dedupe, and the 73+ score threshold).
+// Yield decays as the database grows, hence a range rather than a number.
+const YIELD_LOW = 0.03;
+const YIELD_HIGH = 0.08;
+const REVIEWS_PER_DAY = 25; // Lucas's target review pace (20-30/day)
+
 const fmtUsd = (n) => (n == null ? "–" : `$${n.toFixed(2)}`);
 const fmtWhen = (iso) => {
   if (!iso) return "–";
@@ -52,7 +59,14 @@ export default function SourceTab({ onImported }) {
   }, [status, loadStatus]);
 
   const parsedHashtags = hashtags.split(",").map((h) => h.replace(/^#/, "").trim()).filter(Boolean);
-  const estCost = status ? (maxItems * status.estPerResult).toFixed(2) : null;
+  // Videos actually returned = whichever is smaller: what the hashtags can
+  // yield, or the hard cap. Cost and candidate forecasts both flow from it.
+  const expVideos = Math.min(parsedHashtags.length * (parseInt(resultsPerPage, 10) || 0), parseInt(maxItems, 10) || 0);
+  const estCost = status ? (expVideos * status.estPerResult).toFixed(2) : null;
+  const candLow = Math.max(1, Math.round(expVideos * YIELD_LOW));
+  const candHigh = Math.round(expVideos * YIELD_HIGH);
+  const fmtDays = (n) => (n < 0.75 ? "under a day" : n < 1.5 ? "about a day" : `~${Math.round(n)} days`);
+  const reviewLoad = candHigh > 0 ? `${fmtDays(candLow / REVIEWS_PER_DAY)}–${fmtDays(candHigh / REVIEWS_PER_DAY)}`.replace(/^(.*)–\1$/, "$1") : null;
 
   const draftFromBrief = async () => {
     if (!brief.trim()) return;
@@ -179,9 +193,24 @@ export default function SourceTab({ onImported }) {
           </label>
         </div>
 
+        <div className="forecast">
+          <div className="eyebrow">RUN FORECAST (ESTIMATE)</div>
+          <div className="forecast-line">
+            <b className="mono">{expVideos}</b> videos from {parsedHashtags.length} hashtags
+            <span className="soft"> → </span>
+            <b className="mono">≈{candLow}–{candHigh}</b> new candidates in your Review queue
+            <span className="soft"> → </span>
+            {reviewLoad} of review at {REVIEWS_PER_DAY}/day
+          </div>
+          <p className="soft" style={{ fontSize: 12, margin: "4px 0 0" }}>
+            Based on your real import history (~3–8% of videos survive filtering, dedupe, and the 73+ score bar).
+            Yield drops as your database grows — re-running the same hashtags finds fewer new faces.
+          </p>
+        </div>
+
         <div className="launch-row">
           <span className="soft" style={{ fontSize: 13 }}>
-            {parsedHashtags.length} hashtags · est. scrape cost ~${estCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span>
+            scrape cost ~${estCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
           </span>
           <button className="primary" onClick={launch} disabled={launching || !parsedHashtags.length}>
             {launching ? "Launching…" : "Launch run"}
