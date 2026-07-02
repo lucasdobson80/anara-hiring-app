@@ -11,6 +11,11 @@ const YIELD_LOW = 0.03;
 const YIELD_HIGH = 0.08;
 const REVIEWS_PER_DAY = 25; // Lucas's target review pace (20-30/day)
 
+// The yield forecast only holds for study-adjacent hashtags — warn when the
+// set drifts off-ICP (a generic run can yield literally zero candidates).
+const ICP_HASHTAG_HINT = /stud|grad|phd|thesis|academ|school|student|uni|college|exam|revision|nurs|med|law|productiv|note|learn/i;
+const offIcpShare = (tags) => tags.length === 0 ? 0 : tags.filter((t) => !ICP_HASHTAG_HINT.test(t)).length / tags.length;
+
 const fmtUsd = (n) => (n == null ? "–" : `$${n.toFixed(2)}`);
 const fmtWhen = (iso) => {
   if (!iso) return "–";
@@ -206,6 +211,12 @@ export default function SourceTab({ onImported }) {
             Based on your real import history (~3–8% of videos survive filtering, dedupe, and the 73+ score bar).
             Yield drops as your database grows — re-running the same hashtags finds fewer new faces.
           </p>
+          {offIcpShare(parsedHashtags) > 0.5 && (
+            <p className="off-icp-warn">
+              ⚠ Most of these hashtags look outside the study/academia niche — the forecast above won&apos;t hold,
+              and yield could be near zero. Generic tags (lifestyle, travel, content…) scrape the wrong crowd.
+            </p>
+          )}
         </div>
 
         <div className="launch-row">
@@ -235,13 +246,31 @@ export default function SourceTab({ onImported }) {
       </div>
 
       {importResult && !importResult.error && (
-        <div className="banner" style={{ marginTop: 14, borderRadius: 10 }}>
-          Imported: {importResult.inserted} new candidates added to the queue ·{" "}
-          {importResult.videosFetched} videos → {importResult.uniqueCreators} creators ·{" "}
-          {importResult.alreadyKnown} already in the database · {importResult.hardRejected} hard-rejected ·{" "}
-          {importResult.belowThreshold} below threshold
-          {importResult.insertFailures?.length > 0 && ` · ${importResult.insertFailures.length} failed to insert`}
-        </div>
+        <>
+          <div className="banner" style={{ marginTop: 14, borderRadius: 10 }}>
+            Imported: {importResult.inserted} new candidates added to the queue ·{" "}
+            {importResult.videosFetched} videos → {importResult.uniqueCreators} creators ·{" "}
+            {importResult.alreadyKnown} already in the database · {importResult.hardRejected} hard-rejected ·{" "}
+            {importResult.belowThreshold} below threshold
+            {importResult.insertFailures?.length > 0 && ` · ${importResult.insertFailures.length} failed to insert`}
+          </div>
+          {importResult.inserted === 0 && importResult.topMisses?.length > 0 && (
+            <div className="misses">
+              <div className="eyebrow">NOTHING CLEARED THE BAR — CLOSEST MISSES</div>
+              {importResult.topMisses.map((m) => (
+                <div key={m.handle} className="miss-row">
+                  <span className="mini-stamp mono miss-stamp">{m.score}</span>
+                  <span className="mono">{m.handle}</span>
+                  <span className="soft miss-why">{m.rationale}</span>
+                </div>
+              ))}
+              <p className="soft" style={{ fontSize: 12.5, margin: "8px 0 0" }}>
+                When even the best scores are far below 73, the hashtags usually pointed outside the
+                study/academia niche — try a run closer to the proven set.
+              </p>
+            </div>
+          )}
+        </>
       )}
       {importResult?.error && (
         <div className="banner bad" style={{ marginTop: 14, borderRadius: 10 }}>Import failed: {importResult.error}</div>

@@ -48,6 +48,7 @@ export async function POST(request) {
 
     let scored = 0, inserted = 0, hardRejected = 0, belowThreshold = 0;
     const insertFailures = [];
+    const misses = [];
     if (fresh.length > 0) {
       const { results } = await scoreCandidates(fresh);
       for (const c of fresh) {
@@ -55,7 +56,11 @@ export async function POST(request) {
         if (!s) continue;
         scored += 1;
         if (s.hard_reject) { hardRejected += 1; continue; }
-        if (s.score < THRESHOLD) { belowThreshold += 1; continue; }
+        if (s.score < THRESHOLD) {
+          belowThreshold += 1;
+          misses.push({ handle: c.handle, score: s.score, rationale: s.rationale });
+          continue;
+        }
         try {
           await createCreator({ ...c, score: s.score, rationale: s.rationale, niche: s.niche });
           inserted += 1;
@@ -64,6 +69,9 @@ export async function POST(request) {
         }
       }
     }
+    // Surface the best near-misses so a zero-insert import is explainable
+    // (usually a sign the hashtags were off-ICP, not a system failure).
+    misses.sort((a, b) => b.score - a.score);
 
     return NextResponse.json({
       videosFetched: items.length,
@@ -75,6 +83,7 @@ export async function POST(request) {
       belowThreshold,
       inserted,
       insertFailures,
+      topMisses: misses.slice(0, 5),
     });
   } catch (e) {
     return NextResponse.json({ error: "import", message: e.message }, { status: 502 });

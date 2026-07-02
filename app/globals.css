@@ -99,6 +99,11 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .note-box { background: #14171E; border: 1px solid #272D3A; border-top: none; border-radius: 0 0 12px 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; margin: -6px 6px 0; }
 .booked-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(62,207,142,.07); border: 1px solid rgba(62,207,142,.35); border-radius: 12px; padding: 12px 15px; margin-top: 12px; }
 .booked-box > div:first-child { flex: 1; min-width: 200px; }
+.off-icp-warn { font-size: 12.5px; color: #FFE566; margin: 8px 0 0; line-height: 1.5; }
+.misses { background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 14px 16px; margin-top: 10px; }
+.miss-row { display: flex; align-items: baseline; gap: 10px; margin-top: 8px; font-size: 13px; }
+.miss-stamp { background: #272D3A; color: #98A0B3; }
+.miss-why { flex: 1; font-size: 12.5px; line-height: 1.45; }
 .note-area { min-height: 90px; resize: vertical; font-family: inherit; }
 select.input { appearance: none; }
 .runs { display: flex; flex-direction: column; gap: 7px; }
