@@ -86,6 +86,19 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .forecast { background: #14171E; border: 1px solid #272D3A; border-radius: 12px; padding: 12px 15px; margin-top: 16px; }
 .forecast-line { font-size: 14.5px; margin-top: 6px; line-height: 1.5; }
 .forecast-line b { color: #FFE566; }
+.sched-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.sched-row .input { width: auto; flex: 1; min-width: 140px; }
+.sched-scripts { display: flex; gap: 6px; margin-top: 12px; }
+.day-label { font-family: 'Spline Sans Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #98A0B3; margin: 4px 0 6px; }
+.day-label.hot { color: #FFE566; }
+.call-row-wrap { margin-bottom: 7px; }
+.call-row { display: flex; align-items: center; gap: 12px; background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 11px 14px; flex-wrap: wrap; }
+.call-time { min-width: 52px; font-size: 12.5px; }
+.call-title { flex: 1; font-weight: 700; font-size: 14.5px; min-width: 140px; }
+.small-join { padding: 8px 14px !important; font-size: 13px !important; border-radius: 9px; background: #EFEDE6; color: #0E1014; text-decoration: none; font-weight: 800; }
+.note-box { background: #14171E; border: 1px solid #272D3A; border-top: none; border-radius: 0 0 12px 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; margin: -6px 6px 0; }
+.note-area { min-height: 90px; resize: vertical; font-family: inherit; }
+select.input { appearance: none; }
 .runs { display: flex; flex-direction: column; gap: 7px; }
 .run-row { display: flex; align-items: center; gap: 12px; background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 11px 14px; }
 .run-meta { flex: 1; font-size: 12px; }
