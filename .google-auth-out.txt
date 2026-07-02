@@ -1,0 +1,4 @@
+Opening Google sign-in… If the browser doesn't open, visit:
+
+https://accounts.google.com/o/oauth2/v2/auth?client_id=1038481421658-761japju6g3g06e7h5045jl8rh1drr3b.apps.googleusercontent.com&redirect_uri=http%3A%2F%2F127.0.0.1%3A8765&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events&access_type=offline&prompt=consent
+
