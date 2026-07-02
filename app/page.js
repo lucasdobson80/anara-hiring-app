@@ -266,7 +266,7 @@ export default function AnaraCastingDesk() {
                       {current.notes && <p className="soft">{current.notes}</p>}
                     </div>
                     <div className="actions">
-                      <a className="watch" href={current.link || "#"} target="_blank" rel="noreferrer">Watch their profile ↗</a>
+                      <a className="watch" href={current.link || "#"} target="_blank" rel="noreferrer">View their profile ↗</a>
                       <button className="approve" onClick={() => decide("Approved")}>Approve</button>
                       <button className="reject" onClick={() => decide("Rejected")}>Reject</button>
                       <button className="ghost" onClick={() => copy("dm", dmTemplate(firstNameOf(current.name)))}>
