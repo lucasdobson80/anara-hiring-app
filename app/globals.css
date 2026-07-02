@@ -74,5 +74,21 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .rowbtns { display: flex; gap: 6px; }
 .small { padding: 8px 12px !important; font-size: 14px !important; }
 .setup-steps { text-align: left; max-width: 560px; margin: 14px auto 0; font-size: 14px; line-height: 1.7; color: #EFEDE6; }
+.spendbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #161920; border: 1px solid #272D3A; border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; }
+.spend-num { font-size: 22px; font-weight: 600; margin-top: 3px; }
+.input { background: #0E1014; border: 1px solid #272D3A; border-radius: 9px; color: #EFEDE6; padding: 10px 12px; font-family: inherit; font-size: 14px; width: 100%; }
+.input:focus { outline: none; border-color: #6E7BFF; }
+.nl-row { display: flex; gap: 8px; margin: 12px 0 4px; }
+.fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field span { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #98A0B3; }
+.launch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.runs { display: flex; flex-direction: column; gap: 7px; }
+.run-row { display: flex; align-items: center; gap: 12px; background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 11px 14px; }
+.run-meta { flex: 1; font-size: 12px; }
+.run-succeeded { color: #3ECF8E; border-color: rgba(62,207,142,.4); }
+.run-running, .run-ready { color: #FFE566; border-color: rgba(255,229,102,.4); }
+.run-failed, .run-aborted, .run-timed-out { color: #FF6B5E; border-color: rgba(255,107,94,.4); }
+@media (max-width: 780px) { .fields { grid-template-columns: 1fr; } .nl-row { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media (max-width: 780px) { .frame { grid-template-columns: 1fr; } .rail { display: none; } .onboard-grid { grid-template-columns: 1fr; } h1 { font-size: 24px; } }

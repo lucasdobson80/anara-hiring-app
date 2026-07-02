@@ -6,6 +6,7 @@ import {
   firstNameOf, dmTemplate, igWelcome, welcomeEmail,
   INTERVIEW_INTRO, INTERVIEW_CLOSE, CONTRACT_STEPS, IG_SETUP,
 } from "@/lib/templates";
+import SourceTab from "./source-tab";
 
 // =============================================================
 // ANARA CASTING DESK — creator sourcing + onboarding cockpit
@@ -172,6 +173,7 @@ export default function AnaraCastingDesk() {
             <nav className="tabs" aria-label="Sections">
               <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
               <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
+              <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
             </nav>
           </div>
         </div>
@@ -278,6 +280,8 @@ export default function AnaraCastingDesk() {
               </>)}
             </>
           )}
+
+          {tab === "source" && <SourceTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "onboard" && (
             <>
