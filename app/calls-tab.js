@@ -20,9 +20,11 @@ const fmtDay = (iso) => {
 function matchPerson(event, people) {
   const hay = `${event.title} ${event.description}`.toLowerCase();
   return people.find((p) => {
-    const name = (p.name || "").toLowerCase();
-    const handle = (p.handle || "").toLowerCase().replace(/^@/, "");
-    return (name.length > 3 && hay.includes(name)) || (handle.length > 3 && hay.includes(handle));
+    const name = (p.name || "").toLowerCase().trim();
+    const handle = (p.handle || "").toLowerCase().replace(/^@/, "").trim();
+    // Handles are distinctive; bare names only match when reasonably long,
+    // to avoid "Anna" matching "Hannah's onboarding call".
+    return (handle.length > 3 && hay.includes(handle)) || (name.length > 4 && hay.includes(name));
   });
 }
 

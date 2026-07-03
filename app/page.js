@@ -94,15 +94,17 @@ export default function AnaraCastingDesk() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (tab !== "review") return;
-      if (e.target && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+      // Only in one-by-one review: in Browse (or other tabs) the shortcuts
+      // would act on a card that isn't on screen.
+      if (tab !== "review" || view !== "one") return;
+      if (e.target && ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
       if (e.key === "a" || e.key === "A") decide("Approved");
       if (e.key === "r" || e.key === "R") decide("Rejected");
       if (e.key === "u" || e.key === "U") undo();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [decide, undo, tab]);
+  }, [decide, undo, tab, view]);
 
   const sync = async () => {
     const entries = Object.entries(pending);

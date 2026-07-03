@@ -50,6 +50,9 @@ export default function SourceTab({ onImported }) {
   const [imports, setImports] = useState({});
   const [showArchived, setShowArchived] = useState(false);
   const launchedRef = useRef({});
+  // Synchronous in-flight guard: React state updates too late to stop the
+  // auto-import effect and a manual click starting the same import together.
+  const importInFlightRef = useRef(false);
   const pollRef = useRef(null);
 
   useEffect(() => {
@@ -139,34 +142,48 @@ export default function SourceTab({ onImported }) {
     } finally { setLaunching(false); }
   };
 
-  const importRun = useCallback(async (runId) => {
+  const importRun = useCallback(async (runId, { force = false } = {}) => {
+    if (importInFlightRef.current) return;
+    importInFlightRef.current = true;
     setImporting(runId); setImportResult(null);
     try {
-      const res = await fetch("/api/source/import", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId, days }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      // Large runs are processed in capped batches server-side; keep calling
+      // until nothing remains (each pass only touches unprocessed creators).
+      let data;
+      for (let pass = 0; pass < 8; pass++) {
+        const res = await fetch("/api/source/import", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId, days, force: force && pass === 0 }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+        if (!data.remaining) break;
+      }
       setImportResult(data);
       setImports((im) => {
         const next = { ...im, [runId]: { inserted: data.inserted, screened: data.screened, alreadyKnown: data.alreadyKnown, videosFetched: data.videosFetched, at: Date.now() } };
         store.write("cd_runs_imports", next);
         return next;
       });
-      delete launchedRef.current[runId];
-      store.write("cd_runs_launched", launchedRef.current);
       onImported?.();
+      await loadStatus();
     } catch (e) {
       setImportResult({ error: e.message });
-    } finally { setImporting(null); }
-  }, [days, onImported]);
+    } finally {
+      // Success or failure, stop the auto-import loop for this run — a
+      // persistent error must not retry forever on someone else's dime.
+      delete launchedRef.current[runId];
+      store.write("cd_runs_launched", launchedRef.current);
+      importInFlightRef.current = false;
+      setImporting(null);
+    }
+  }, [days, onImported, loadStatus]);
 
   // Auto-import: a run launched from the app that just reached SUCCEEDED
   useEffect(() => {
-    if (importing) return;
+    if (importing || importInFlightRef.current) return;
     const ready = status?.runs?.find(
-      (r) => r.status === "SUCCEEDED" && launchedRef.current[r.id] && !imports[r.id]
+      (r) => r.status === "SUCCEEDED" && launchedRef.current[r.id] && !imports[r.id] && !r.importResult?.done
     );
     if (ready) importRun(ready.id);
   }, [status, imports, importing, importRun]);
@@ -288,7 +305,10 @@ export default function SourceTab({ onImported }) {
       {(!status.runs || status.runs.length === 0) && <p className="soft" style={{ fontSize: 13.5 }}>No runs yet.</p>}
       <div className="runs">
         {status.runs?.filter((r) => showArchived || !archived[r.id]).map((r) => {
-          const imp = imports[r.id];
+          // Prefer the server-side import record (shared across devices);
+          // fall back to this browser's memory of older imports.
+          const imp = r.importResult?.summary || imports[r.id];
+          const partial = r.importResult && !r.importResult.done;
           const isImporting = importing === r.id;
           const wasLaunchedHere = Boolean(launchedRef.current[r.id]);
           return (
@@ -310,7 +330,7 @@ export default function SourceTab({ onImported }) {
                 {isImporting && <span className="soft run-summary">Scoring… takes a minute or two</span>}
                 {!isImporting && imp && (
                   <span className="run-summary ok">
-                    ✓ imported → <b>{imp.inserted} added to Review</b> · {imp.screened} screened out · {imp.alreadyKnown} already known
+                    {partial ? "◐ partially imported" : "✓ imported"} → <b>{imp.inserted} added to Review</b> · {imp.screened} screened out · {imp.alreadyKnown} already known
                   </span>
                 )}
                 {!isImporting && !imp && r.status === "SUCCEEDED" && (
@@ -320,8 +340,12 @@ export default function SourceTab({ onImported }) {
                   <span className="soft run-summary">{r.status === "RUNNING" || r.status === "READY" ? "Scraping… auto-imports when done" : "Run did not finish"}</span>
                 )}
                 {r.status === "SUCCEEDED" && !isImporting && (
-                  <button className="ghost small" onClick={() => importRun(r.id)} disabled={importing !== null}>
-                    {imp ? "Re-import" : "Import & score"}
+                  <button
+                    className="ghost small"
+                    onClick={() => importRun(r.id, { force: Boolean(imp) && !partial })}
+                    disabled={importing !== null}
+                  >
+                    {partial ? "Continue import" : imp ? "Re-check" : "Import & score"}
                   </button>
                 )}
               </div>
