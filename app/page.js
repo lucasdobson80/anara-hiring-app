@@ -44,6 +44,8 @@ export default function AnaraCastingDesk() {
   const [counts, setCounts] = useState({});
   const [view, setView] = useState("one"); // "one" | "browse"
   const [selected, setSelected] = useState(null);
+  const [onboardSearch, setOnboardSearch] = useState("");
+  const [onboardStage, setOnboardStage] = useState("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -299,14 +301,42 @@ export default function AnaraCastingDesk() {
                 </div>
               )}
               {!loading && !error && roster.length > 0 && (
+                <>
+                <div className="onboard-tools">
+                  <input
+                    className="input"
+                    placeholder="Search creators…"
+                    value={onboardSearch}
+                    onChange={(e) => setOnboardSearch(e.target.value)}
+                  />
+                  {["All", ...ONBOARD_STAGES].map((s) => (
+                    <button key={s} className={"chip" + (onboardStage === s ? " on" : "")} onClick={() => setOnboardStage(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
                 <div className="onboard-grid">
                   <div className="roster">
-                    {roster.map((c) => (
-                      <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
-                        <span className="rname">{c.name || c.handle}</span>
-                        <span className="badge">{stageOf(c)}</span>
-                      </button>
-                    ))}
+                    {ONBOARD_STAGES.filter((stage) => onboardStage === "All" || onboardStage === stage).map((stage) => {
+                      const q = onboardSearch.trim().toLowerCase();
+                      const members = roster.filter(
+                        (c) =>
+                          stageOf(c) === stage &&
+                          (!q || (c.name || "").toLowerCase().includes(q) || (c.handle || "").toLowerCase().includes(q))
+                      );
+                      if (!members.length) return null;
+                      return (
+                        <div key={stage}>
+                          <div className="roster-head"><span>{stage.toUpperCase()}</span><span>{members.length}</span></div>
+                          {members.map((c) => (
+                            <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
+                              <span className="rname">{c.name || c.handle}</span>
+                              <span className="badge">{stageOf(c)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="stagework">
                     {!selected && <div className="soft" style={{ padding: 20 }}>Pick a creator to see the playbook for their stage.</div>}
@@ -334,6 +364,7 @@ export default function AnaraCastingDesk() {
                     })()}
                   </div>
                 </div>
+                </>
               )}
             </>
           )}

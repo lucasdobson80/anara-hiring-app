@@ -15,6 +15,14 @@ const PRESETS = {
   "Med & nursing": "medschool, medstudent, nursingschool, nursingstudent, premed, futuredoctor, scrublife, medtok",
 };
 
+// Follower-band presets: the band is a per-run targeting decision, not a
+// buried number. Wide is the default — scoring sorts out the rest.
+const BANDS = {
+  "Nano 500–5k": [500, 5000],
+  "Sweet spot 1k–60k": [1000, 60000],
+  "Wide 500–100k": [500, 100000],
+};
+
 // Candidate-yield forecast, calibrated on real imports (Jul 2026: ~4-5% of
 // scraped videos survive pre-filters, dedupe, and the 73+ score threshold).
 // Yield decays as the database grows, hence a range rather than a number.
@@ -52,9 +60,32 @@ export default function SourceTab({ onImported }) {
   const [resultsPerPage, setResultsPerPage] = useState(60);
   const [days, setDays] = useState(30);
   const [maxItems, setMaxItems] = useState(500);
-  const [minFollowers, setMinFollowers] = useState(1000);
+  const [minFollowers, setMinFollowers] = useState(500);
   const [maxFollowers, setMaxFollowers] = useState(100000);
   const [threshold, setThreshold] = useState(70);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState(null);
+
+  const suggestNext = async () => {
+    setSuggesting(true); setSuggestions(null);
+    try {
+      const res = await fetch("/api/source/suggest", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      setSuggestions(data.suggestions);
+    } catch (e) {
+      setSuggestions([{ title: "Couldn't suggest", hashtags: [], searchQueries: [], rationale: e.message, error: true }]);
+    } finally { setSuggesting(false); }
+  };
+
+  const useSuggestion = (s) => {
+    setHashtags(s.hashtags.join(", "));
+    setSearchTerms((s.searchQueries || []).join(", "));
+    if (s.minFollowers) setMinFollowers(s.minFollowers);
+    if (s.maxFollowers) setMaxFollowers(s.maxFollowers);
+    setSuggestions(null);
+    setBriefNote(`Loaded suggestion: ${s.title} — ${s.rationale}`);
+  };
   const [brief, setBrief] = useState("");
   const [briefNote, setBriefNote] = useState(null);
   const [parsing, setParsing] = useState(false);
@@ -258,7 +289,26 @@ export default function SourceTab({ onImported }) {
           <button className="ghost" onClick={draftFromBrief} disabled={parsing || !status.ready.anthropic}>
             {parsing ? "Drafting…" : "Draft config"}
           </button>
+          <button className="ghost" onClick={suggestNext} disabled={suggesting || !status.ready.anthropic}>
+            {suggesting ? "Thinking…" : "✨ Suggest next run"}
+          </button>
         </div>
+
+        {suggestions && (
+          <div className="suggestions">
+            {suggestions.map((s, i) => (
+              <div key={i} className="suggestion-card">
+                <div className="suggestion-head">
+                  <b>{s.title}</b>
+                  {!s.error && <button className="chip on" onClick={() => useSuggestion(s)}>Use this</button>}
+                </div>
+                {s.hashtags.length > 0 && <div className="mono suggestion-tags">#{s.hashtags.join(" #")}</div>}
+                {s.searchQueries?.length > 0 && <div className="mono suggestion-tags">🔎 {s.searchQueries.join(" · ")}</div>}
+                <p className="soft" style={{ fontSize: 12.5, margin: "6px 0 0" }}>{s.rationale}</p>
+              </div>
+            ))}
+          </div>
+        )}
         {!status.ready.anthropic && (
           <p className="hint" style={{ marginTop: 4 }}>
             Natural-language drafting and scoring need <span className="mono">ANTHROPIC_API_KEY</span> — the form and launch still work.
@@ -273,6 +323,18 @@ export default function SourceTab({ onImported }) {
               key={name}
               className={"chip" + (hashtags === tags ? " on" : "")}
               onClick={() => setHashtags(tags)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <div className="preset-row">
+          <span className="eyebrow" style={{ marginRight: 4 }}>FOLLOWER BAND</span>
+          {Object.entries(BANDS).map(([name, [lo, hi]]) => (
+            <button
+              key={name}
+              className={"chip" + (minFollowers === lo && maxFollowers === hi ? " on" : "")}
+              onClick={() => { setMinFollowers(lo); setMaxFollowers(hi); }}
             >
               {name}
             </button>

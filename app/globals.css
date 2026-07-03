@@ -45,7 +45,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .error { padding: 20px 22px; background: #331512; color: #FF6B5E; border-radius: 14px; }
 .onboard-grid { display: grid; grid-template-columns: 250px 1fr; gap: 18px; }
 .roster { display: flex; flex-direction: column; gap: 6px; }
-.roster-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #14171E; border: 1px solid #272D3A; border-radius: 10px; padding: 11px 12px; color: #EFEDE6; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: left; }
+.roster-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #14171E; border: 1px solid #272D3A; border-radius: 10px; padding: 11px 12px; color: #EFEDE6; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-align: left; width: 100%; margin-bottom: 6px; }
 .roster-row.on { border-color: #6E7BFF; background: rgba(110,123,255,.08); }
 .badge { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .06em; color: #98A0B3; border: 1px solid #272D3A; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .stagework { background: #161920; border: 1px solid #272D3A; border-radius: 16px; padding: 20px 22px; }
@@ -80,6 +80,14 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .input:focus { outline: none; border-color: #6E7BFF; }
 .nl-row { display: flex; gap: 8px; margin: 12px 0 4px; }
 .preset-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+.suggestion-card { background: #14171E; border: 1px solid #272D3A; border-radius: 12px; padding: 12px 14px; }
+.suggestion-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.suggestion-tags { font-size: 11.5px; color: #98A0B3; margin-top: 6px; line-height: 1.5; word-break: break-word; }
+.onboard-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.onboard-tools .input { width: auto; flex: 1; min-width: 160px; }
+.roster-head { font-family: 'Spline Sans Mono', monospace; font-size: 10.5px; letter-spacing: .16em; color: #98A0B3; margin: 12px 0 6px; display: flex; justify-content: space-between; }
+.roster-head:first-child { margin-top: 0; }
 .fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field span { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #98A0B3; }
