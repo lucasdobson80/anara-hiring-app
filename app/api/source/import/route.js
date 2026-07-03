@@ -9,11 +9,11 @@ import { fetchAllCreators, createCreator, handleExists, normHandle } from "@/lib
 // and cap the per-invocation batch so we never hit the ceiling mid-write.
 export const maxDuration = 300;
 
-const THRESHOLD = 73;
 const BATCH_CAP = 200; // fresh creators processed per invocation
 const CHUNK = 20; // candidates per scoring call
 const LOCK_KEY = "CASTING_DESK_LOCK";
 const RESULT_KEY = "CASTING_DESK_IMPORT";
+const CONFIG_KEY = "CASTING_DESK_CONFIG";
 const LOCK_TTL_MS = 8 * 60_000;
 
 const addNums = (a = 0, b = 0) => (a || 0) + (b || 0);
@@ -84,9 +84,16 @@ export async function POST(request) {
     await setRunRecord(kvId, LOCK_KEY, { at: Date.now() });
     lockTaken = true;
 
+    // Settings travel with the run (written at launch); body values are a
+    // fallback for runs launched before this existed or outside the app.
+    const config = (await getRunRecord(kvId, CONFIG_KEY).catch(() => null)) || {};
+    const days = config.days || body.days || 30;
+    const minFollowers = config.minFollowers ?? 1000;
+    const maxFollowers = config.maxFollowers ?? 150000;
+    const threshold = Math.min(Math.max(config.threshold || body.threshold || 70, 60), 85);
+
     const items = await getDatasetItems(run.defaultDatasetId);
-    const days = body.days || 30;
-    const { candidates, filtered, uniqueCreators } = aggregateCandidates(items, { days });
+    const { candidates, filtered, uniqueCreators } = aggregateCandidates(items, { days, minFollowers, maxFollowers });
 
     // Dedupe by canonical handle against the entire existing database
     const existing = await fetchAllCreators();
@@ -107,7 +114,7 @@ export async function POST(request) {
       const chunk = batch.slice(i, i + CHUNK);
       let results;
       try {
-        ({ results } = await scoreCandidates(chunk));
+        ({ results } = await scoreCandidates(chunk, threshold));
       } catch (e) {
         chunkErrors.push(e.message);
         continue;
@@ -116,9 +123,9 @@ export async function POST(request) {
         const s = results.get(normHandle(c.handle));
         if (!s) { unscored += 1; continue; }
         scored += 1;
-        const rejected = s.hard_reject || s.score < THRESHOLD;
+        const rejected = s.hard_reject || s.score < threshold;
         if (s.hard_reject) hardRejected += 1;
-        else if (s.score < THRESHOLD) {
+        else if (s.score < threshold) {
           belowThreshold += 1;
           misses.push({ handle: c.handle, score: s.score, rationale: s.rationale });
         }

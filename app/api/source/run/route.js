@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { hasApifyToken, startRun } from "@/lib/apify";
+import { hasApifyToken, startRun, setRunRecord } from "@/lib/apify";
+
+const clamp = (v, lo, hi, dflt) => Math.min(Math.max(parseInt(v, 10) || dflt, lo), hi);
 
 export async function POST(request) {
   if (!hasApifyToken()) {
@@ -12,14 +14,25 @@ export async function POST(request) {
     return NextResponse.json({ error: "bad-request", message: "Invalid JSON body." }, { status: 400 });
   }
   const hashtags = (body.hashtags || []).map((h) => String(h).replace(/^#/, "").trim()).filter(Boolean);
-  const resultsPerPage = Math.min(Math.max(parseInt(body.resultsPerPage, 10) || 60, 1), 200);
-  const days = Math.min(Math.max(parseInt(body.days, 10) || 30, 1), 365);
-  const maxItems = Math.min(Math.max(parseInt(body.maxItems, 10) || 500, 10), 1500);
-  if (!hashtags.length) {
-    return NextResponse.json({ error: "bad-request", message: "At least one hashtag is required." }, { status: 400 });
+  const searchQueries = (body.searchQueries || []).map((q) => String(q).trim()).filter(Boolean).slice(0, 6);
+  const resultsPerPage = clamp(body.resultsPerPage, 1, 200, 60);
+  const days = clamp(body.days, 1, 365, 30);
+  const maxItems = clamp(body.maxItems, 10, 1500, 500);
+  const minFollowers = clamp(body.minFollowers, 0, 10_000_000, 1000);
+  const maxFollowers = clamp(body.maxFollowers, minFollowers, 10_000_000, 100000);
+  const threshold = clamp(body.threshold, 60, 85, 70);
+  if (!hashtags.length && !searchQueries.length) {
+    return NextResponse.json({ error: "bad-request", message: "At least one hashtag or search term is required." }, { status: 400 });
   }
   try {
-    const run = await startRun({ hashtags, resultsPerPage, days, maxItems });
+    const run = await startRun({ hashtags, searchQueries, resultsPerPage, days, maxItems });
+    // Persist the run's own import settings next to it, so import (auto or
+    // manual, any device) applies exactly what this run was launched with.
+    if (run.defaultKeyValueStoreId) {
+      await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
+        days, minFollowers, maxFollowers, threshold,
+      }).catch(() => {});
+    }
     return NextResponse.json({ id: run.id, status: run.status });
   } catch (e) {
     return NextResponse.json({ error: "apify", message: e.message }, { status: 502 });

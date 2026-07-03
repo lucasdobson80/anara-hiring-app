@@ -4,6 +4,17 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 const DEFAULT_HASHTAGS = "studytok, studytips, studywithme, gradschool, phdlife, gradstudent, thesis, academia";
 
+// One-click niche rotation — fresh hashtag sets are what produce genuinely
+// new creators day after day; re-running the same set mostly re-finds the
+// same top posts.
+const PRESETS = {
+  "Study": DEFAULT_HASHTAGS,
+  "Student life": "unilife, collegelife, dormlife, freshman, studentlife, uniday, campuslife, backtouni",
+  "Lifestyle": "dayinmylife, grwm, morningroutine, storytime, weekinmylife, vlog, thatgirl, resetroutine",
+  "Tech & career": "techtok, careertok, internship, corporatelife, 9to5, codinglife, worklife, firstjob",
+  "Med & nursing": "medschool, medstudent, nursingschool, nursingstudent, premed, futuredoctor, scrublife, medtok",
+};
+
 // Candidate-yield forecast, calibrated on real imports (Jul 2026: ~4-5% of
 // scraped videos survive pre-filters, dedupe, and the 73+ score threshold).
 // Yield decays as the database grows, hence a range rather than a number.
@@ -37,9 +48,13 @@ export default function SourceTab({ onImported }) {
   const [status, setStatus] = useState(null); // { ready, spend, runs, estPerResult }
   const [error, setError] = useState(null);
   const [hashtags, setHashtags] = useState(DEFAULT_HASHTAGS);
+  const [searchTerms, setSearchTerms] = useState("");
   const [resultsPerPage, setResultsPerPage] = useState(60);
   const [days, setDays] = useState(30);
   const [maxItems, setMaxItems] = useState(500);
+  const [minFollowers, setMinFollowers] = useState(1000);
+  const [maxFollowers, setMaxFollowers] = useState(100000);
+  const [threshold, setThreshold] = useState(70);
   const [brief, setBrief] = useState("");
   const [briefNote, setBriefNote] = useState(null);
   const [parsing, setParsing] = useState(false);
@@ -95,9 +110,11 @@ export default function SourceTab({ onImported }) {
   }, [status, loadStatus]);
 
   const parsedHashtags = hashtags.split(",").map((h) => h.replace(/^#/, "").trim()).filter(Boolean);
-  // Videos actually returned = whichever is smaller: what the hashtags can
-  // yield, or the hard cap. Cost and candidate forecasts both flow from it.
-  const expVideos = Math.min(parsedHashtags.length * (parseInt(resultsPerPage, 10) || 0), parseInt(maxItems, 10) || 0);
+  const parsedSearchTerms = searchTerms.split(",").map((q) => q.trim()).filter(Boolean);
+  // Videos actually returned = whichever is smaller: what the hashtags and
+  // search terms can yield, or the hard cap. Cost and forecasts flow from it.
+  const sourceCount = parsedHashtags.length + parsedSearchTerms.length;
+  const expVideos = Math.min(sourceCount * (parseInt(resultsPerPage, 10) || 0), parseInt(maxItems, 10) || 0);
   const estCost = status ? (expVideos * status.estPerResult).toFixed(2) : null;
   const candLow = Math.max(1, Math.round(expVideos * YIELD_LOW));
   const candHigh = Math.round(expVideos * YIELD_HIGH);
@@ -115,9 +132,12 @@ export default function SourceTab({ onImported }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       setHashtags(data.hashtags.join(", "));
+      setSearchTerms((data.searchQueries || []).join(", "));
       setResultsPerPage(data.resultsPerPage);
       setDays(data.days);
       setMaxItems(data.maxItems);
+      if (data.minFollowers) setMinFollowers(data.minFollowers);
+      if (data.maxFollowers) setMaxFollowers(data.maxFollowers);
       setBriefNote(data.note);
     } catch (e) {
       setBriefNote("Couldn't draft a config: " + e.message);
@@ -129,7 +149,10 @@ export default function SourceTab({ onImported }) {
     try {
       const res = await fetch("/api/source/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hashtags: parsedHashtags, resultsPerPage, days, maxItems }),
+        body: JSON.stringify({
+          hashtags: parsedHashtags, searchQueries: parsedSearchTerms,
+          resultsPerPage, days, maxItems, minFollowers, maxFollowers, threshold,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
@@ -243,13 +266,35 @@ export default function SourceTab({ onImported }) {
         )}
         {briefNote && <p className="soft" style={{ fontSize: 13, margin: "6px 0 0" }}>{briefNote}</p>}
 
+        <div className="preset-row">
+          <span className="eyebrow" style={{ marginRight: 4 }}>NICHE PRESETS</span>
+          {Object.entries(PRESETS).map(([name, tags]) => (
+            <button
+              key={name}
+              className={"chip" + (hashtags === tags ? " on" : "")}
+              onClick={() => setHashtags(tags)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+
         <div className="fields">
           <label className="field" style={{ gridColumn: "1 / -1" }}>
             <span>Hashtags</span>
             <input className="input" value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
           </label>
+          <label className="field" style={{ gridColumn: "1 / -1" }}>
+            <span>Search terms (optional — reaches creators hashtags miss, comma-separated)</span>
+            <input
+              className="input"
+              placeholder='e.g. day in my life uni student, study vlog, how I revise'
+              value={searchTerms}
+              onChange={(e) => setSearchTerms(e.target.value)}
+            />
+          </label>
           <label className="field">
-            <span>Videos per hashtag</span>
+            <span>Videos per source</span>
             <input className="input" type="number" value={resultsPerPage} onChange={(e) => setResultsPerPage(e.target.value)} />
           </label>
           <label className="field">
@@ -260,12 +305,24 @@ export default function SourceTab({ onImported }) {
             <span>Max total results</span>
             <input className="input" type="number" value={maxItems} onChange={(e) => setMaxItems(e.target.value)} />
           </label>
+          <label className="field">
+            <span>Min followers</span>
+            <input className="input" type="number" value={minFollowers} onChange={(e) => setMinFollowers(Number(e.target.value))} />
+          </label>
+          <label className="field">
+            <span>Max followers</span>
+            <input className="input" type="number" value={maxFollowers} onChange={(e) => setMaxFollowers(Number(e.target.value))} />
+          </label>
+          <label className="field">
+            <span>Score bar (60–85)</span>
+            <input className="input" type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+          </label>
         </div>
 
         <div className="forecast">
           <div className="eyebrow">RUN FORECAST (ESTIMATE)</div>
           <div className="forecast-line">
-            <b className="mono">{expVideos}</b> videos from {parsedHashtags.length} hashtags
+            <b className="mono">{expVideos}</b> videos from {parsedHashtags.length} hashtags{parsedSearchTerms.length > 0 && ` + ${parsedSearchTerms.length} searches`}
             <span className="soft"> → </span>
             <b className="mono">≈{candLow}–{candHigh}</b> new candidates in your Review queue
             <span className="soft"> → </span>
@@ -288,7 +345,7 @@ export default function SourceTab({ onImported }) {
           <span className="soft" style={{ fontSize: 13 }}>
             scrape cost ~${estCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
           </span>
-          <button className="primary" onClick={launch} disabled={launching || !parsedHashtags.length}>
+          <button className="primary" onClick={launch} disabled={launching || (!parsedHashtags.length && !parsedSearchTerms.length)}>
             {launching ? "Launching…" : "Launch run"}
           </button>
         </div>

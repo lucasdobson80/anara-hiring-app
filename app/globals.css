@@ -79,6 +79,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .input { background: #0E1014; border: 1px solid #272D3A; border-radius: 9px; color: #EFEDE6; padding: 10px 12px; font-family: inherit; font-size: 14px; width: 100%; }
 .input:focus { outline: none; border-color: #6E7BFF; }
 .nl-row { display: flex; gap: 8px; margin: 12px 0 4px; }
+.preset-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
 .fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field span { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #98A0B3; }
