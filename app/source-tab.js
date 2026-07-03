@@ -332,6 +332,13 @@ export default function SourceTab({ onImported }) {
             Based on your real import history (~3–8% of videos survive filtering, dedupe, and the 73+ score bar).
             Yield drops as your database grows — re-running the same hashtags finds fewer new faces.
           </p>
+          {maxFollowers > 0 && maxFollowers < 20000 && (
+            <p className="off-icp-warn">
+              ⚠ Max followers is set to {Number(maxFollowers).toLocaleString()} — a very narrow band. Most scraped
+              creators sit between 10k and 100k, so this will filter out nearly everyone before scoring.
+              (Your last run with a 5k cap dropped 87% of creators here.)
+            </p>
+          )}
           {offIcpShare(parsedHashtags) > 0.5 && (
             <p className="off-icp-warn">
               ⚠ Most of these hashtags don&apos;t obviously point at Anara&apos;s audiences (study, students,
