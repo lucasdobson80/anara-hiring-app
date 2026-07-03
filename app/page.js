@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, dmTemplate, igWelcome, welcomeEmail,
+  firstNameOf, dmTemplate, igWelcome, welcomeEmail, mailtoLink,
   INTERVIEW_INTRO, INTERVIEW_CLOSE, CONTRACT_STEPS, IG_SETUP,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
@@ -270,6 +270,12 @@ export default function AnaraCastingDesk() {
                       <div className="eyebrow">WHY IT SCORED THIS WAY</div>
                       <p>{current.rationale || "No rationale recorded."}</p>
                       {current.notes && <p className="soft">{current.notes}</p>}
+                      {current.email && (
+                        <p className="email-line mono">
+                          ✉ {current.email}
+                          {/talent|management|agency|underscore|undercurrent|unitedtalent/i.test(current.email) && <span className="soft"> (agency — likely a managed creator)</span>}
+                        </p>
+                      )}
                     </div>
                     <div className="actions">
                       <a className="watch" href={current.link || "#"} target="_blank" rel="noreferrer">View their profile ↗</a>
@@ -278,6 +284,15 @@ export default function AnaraCastingDesk() {
                       <button className="ghost" onClick={() => copy("dm", dmTemplate(firstNameOf(current.name)))}>
                         {copiedKey === "dm" ? "Copied ✓" : "Copy outreach DM"}
                       </button>
+                      {current.email && (
+                        <a
+                          className="ghost"
+                          href={mailtoLink(current.email, firstNameOf(current.name))}
+                          onClick={() => copy("emaildm", dmTemplate(firstNameOf(current.name)))}
+                        >
+                          {copiedKey === "emaildm" ? "Email opened · DM copied ✓" : "Email + copy DM"}
+                        </a>
+                      )}
                       {pendingCount > 0 && <button className="ghost" onClick={undo}>Undo</button>}
                     </div>
                   </article>
@@ -358,7 +373,7 @@ export default function AnaraCastingDesk() {
                               <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{s}</button>
                             ))}
                           </div>
-                          <StagePack stage={stage} first={first} copy={copy} copiedKey={copiedKey} />
+                          <StagePack stage={stage} first={first} email={c.email} copy={copy} copiedKey={copiedKey} />
                         </div>
                       );
                     })()}
@@ -384,16 +399,21 @@ export default function AnaraCastingDesk() {
   );
 }
 
-function StagePack({ stage, first, copy, copiedKey }) {
+function StagePack({ stage, first, email, copy, copiedKey }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} ↗</a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
   );
   if (stage === "Approved") return (
     <div className="pack">
-      <div className="eyebrow">NEXT MOVE: SEND THE DM</div>
-      <p className="soft">Follow them on TikTok first, then DM from your account. Company rule: send the template exactly.</p>
+      <div className="eyebrow">NEXT MOVE: SEND THE DM{email ? " + EMAIL" : ""}</div>
+      <p className="soft">Follow them on TikTok first, then DM from your account. Company rule: send the template exactly.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
       <C k="p-dm" text={dmTemplate(first)}>Copy outreach DM</C>
+      {email && (
+        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, first)} onClick={() => copy("p-emaildm", dmTemplate(first))}>
+          {copiedKey === "p-emaildm" ? "Email opened · DM copied ✓" : `Email ${email} + copy DM`}
+        </a>
+      )}
       <L href={LINKS.messageBank}>Outreach Message Bank</L>
       <p className="soft">Once sent, move them to Contacted and Save.</p>
     </div>
