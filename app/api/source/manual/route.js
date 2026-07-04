@@ -64,7 +64,9 @@ export async function POST(request) {
     }
     if (postURLs.length) input.postURLs = postURLs;
 
-    const items = await runSyncItems(input, { maxItems: MAX_PROFILES * 6 });
+    // Reservation on pay-per-result actors = maxItems × price: size it to
+    // what was actually pasted so small adds work even on tight plans.
+    const items = await runSyncItems(input, { maxItems: (profiles.length + postURLs.length) * 6 });
     // Manual picks bypass the mechanical filters — the human chose them
     const { candidates } = aggregateCandidates(items, { days: 3650, lenient: true });
 
