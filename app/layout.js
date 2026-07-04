@@ -3,6 +3,12 @@ import "./globals.css";
 export const metadata = {
   title: "Anara Casting Desk",
   description: "Creator sourcing + onboarding cockpit",
+  icons: { apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Casting Desk", statusBarStyle: "black-translucent" },
+};
+
+export const viewport = {
+  themeColor: "#0E1014",
 };
 
 export default function RootLayout({ children }) {
