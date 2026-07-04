@@ -49,5 +49,7 @@ export function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Icons + manifest stay public: iOS fetches them outside the authenticated
+  // session when installing to the home screen. They contain nothing private.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon-192.png|icon-512.png|apple-touch-icon.png|icon.svg).*)"],
 };
