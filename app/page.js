@@ -372,13 +372,33 @@ export default function AnaraCastingDesk() {
                               <div className="name">{c.name || c.handle}</div>
                               <a className="mono soft" href={c.link || "#"} target="_blank" rel="noreferrer">{c.handle} ↗</a>
                             </div>
+                            {stage !== "Rejected" && (
+                              <button className="reject small" onClick={() => moveStage(c, "Rejected")}>
+                                ✕ Remove
+                              </button>
+                            )}
                           </div>
-                          <div className="stepper">
-                            {ONBOARD_STAGES.map((s) => (
-                              <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{s}</button>
-                            ))}
-                          </div>
-                          <StagePack stage={stage} first={first} email={c.email} copy={copy} copiedKey={copiedKey} />
+                          {stage === "Rejected" ? (
+                            <div className="pack">
+                              <div className="eyebrow" style={{ color: "#FF6B5E" }}>QUEUED FOR REMOVAL</div>
+                              <p className="soft">
+                                Press Save (top right) to confirm — they&apos;ll leave the pipeline as Rejected,
+                                and the scraper can never re-import them. Changed your mind?
+                              </p>
+                              <button className="ghost" onClick={() => setPending((p) => { const n = { ...p }; delete n[c.id]; return n; })}>
+                                Undo removal
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="stepper">
+                                {ONBOARD_STAGES.map((s) => (
+                                  <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{s}</button>
+                                ))}
+                              </div>
+                              <StagePack stage={stage} first={first} email={c.email} copy={copy} copiedKey={copiedKey} />
+                            </>
+                          )}
                         </div>
                       );
                     })()}
