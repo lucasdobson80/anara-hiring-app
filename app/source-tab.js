@@ -147,8 +147,11 @@ export default function SourceTab({ onImported }) {
   const sourceCount = parsedHashtags.length + parsedSearchTerms.length;
   const expVideos = Math.min(sourceCount * (parseInt(resultsPerPage, 10) || 0), parseInt(maxItems, 10) || 0);
   const estCost = status ? (expVideos * status.estPerResult).toFixed(2) : null;
-  const candLow = Math.max(1, Math.round(expVideos * YIELD_LOW));
-  const candHigh = Math.round(expVideos * YIELD_HIGH);
+  // Small bands keep fewer of the scraped videos (hashtag top-posts skew
+  // big), so the forecast scales down to stay honest.
+  const bandScale = maxFollowers > 0 && maxFollowers < 20000 ? 0.6 : 1;
+  const candLow = Math.max(1, Math.round(expVideos * YIELD_LOW * bandScale));
+  const candHigh = Math.max(1, Math.round(expVideos * YIELD_HIGH * bandScale));
   const fmtDays = (n) => (n < 0.75 ? "under a day" : n < 1.5 ? "about a day" : `~${Math.round(n)} days`);
   const reviewLoad = candHigh > 0 ? `${fmtDays(candLow / REVIEWS_PER_DAY)}–${fmtDays(candHigh / REVIEWS_PER_DAY)}`.replace(/^(.*)–\1$/, "$1") : null;
 
@@ -395,10 +398,11 @@ export default function SourceTab({ onImported }) {
             Yield drops as your database grows — re-running the same hashtags finds fewer new faces.
           </p>
           {maxFollowers > 0 && maxFollowers < 20000 && (
-            <p className="off-icp-warn">
-              ⚠ Max followers is set to {Number(maxFollowers).toLocaleString()} — a very narrow band. Most scraped
-              creators sit between 10k and 100k, so this will filter out nearly everyone before scoring.
-              (Your last run with a 5k cap dropped 87% of creators here.)
+            <p className="band-tip">
+              Small-creator band active — good, they reply most. Note hashtag top-posts skew big
+              (only ~25–30% of a typical scrape is under 15k), so the discards are the big accounts,
+              working as intended. To keep yield up: long-tail hashtags (Nano preset or ✨ suggestions),
+              search terms, and a higher videos-per-source to dig past the viral top posts.
             </p>
           )}
           {offIcpShare(parsedHashtags) > 0.5 && (
