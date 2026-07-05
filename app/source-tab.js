@@ -19,6 +19,7 @@ const PRESETS = {
 // buried number. Wide is the default — scoring sorts out the rest.
 const BANDS = {
   "Nano 500–5k": [500, 5000],
+  "Small 500–15k": [500, 15000],
   "Sweet spot 1k–60k": [1000, 60000],
   "Wide 500–100k": [500, 100000],
 };
@@ -61,32 +62,10 @@ export default function SourceTab({ onImported }) {
   const [days, setDays] = useState(30);
   const [maxItems, setMaxItems] = useState(500);
   const [minFollowers, setMinFollowers] = useState(500);
-  const [maxFollowers, setMaxFollowers] = useState(100000);
+  const [maxFollowers, setMaxFollowers] = useState(15000);
   const [threshold, setThreshold] = useState(70);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
-  const [manualText, setManualText] = useState("");
-  const [manualBusy, setManualBusy] = useState(false);
-  const [manualResult, setManualResult] = useState(null);
-
-  const addManually = async () => {
-    if (!manualText.trim()) return;
-    setManualBusy(true); setManualResult(null);
-    try {
-      const res = await fetch("/api/source/manual", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: manualText }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      setManualResult(data);
-      setManualText("");
-      onImported?.();
-    } catch (e) {
-      setManualResult({ error: e.message });
-    } finally { setManualBusy(false); }
-  };
-
   const suggestNext = async () => {
     setSuggesting(true); setSuggestions(null);
     try {
@@ -439,38 +418,6 @@ export default function SourceTab({ onImported }) {
             {launching ? "Launching…" : "Launch run"}
           </button>
         </div>
-      </div>
-
-      <div className="card" style={{ padding: "18px 22px", marginBottom: 18 }}>
-        <div className="eyebrow">ADD FROM YOUR OWN SCROLLING</div>
-        <p className="soft" style={{ fontSize: 13, margin: "8px 0 0" }}>
-          Found someone while scrolling? Paste their profile links, video links, or @handles (any mix,
-          separated by spaces or new lines). They&apos;ll be scraped for stats, scored for context, and added
-          straight to Review — no score bar, your pick always gets through. Hand-picking someone the AI
-          screened out rescues them into the queue.
-        </p>
-        <textarea
-          className="input note-area"
-          style={{ marginTop: 10, minHeight: 70 }}
-          placeholder={"https://www.tiktok.com/@creator1\n@creator2  tiktok.com/@creator3/video/123…"}
-          value={manualText}
-          onChange={(e) => setManualText(e.target.value)}
-        />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-          <button className="primary" onClick={addManually} disabled={manualBusy || !manualText.trim()}>
-            {manualBusy ? "Scraping & scoring… ~1 min" : "Add to Review"}
-          </button>
-        </div>
-        {manualResult && !manualResult.error && (
-          <div className="banner" style={{ marginTop: 10, borderRadius: 10 }}>
-            {manualResult.added} added · {manualResult.rescued} rescued from screened/rejected ·{" "}
-            {manualResult.alreadyKnown} already in the pipeline
-            {manualResult.notFound?.length > 0 && ` · not found: ${manualResult.notFound.join(", ")}`}
-          </div>
-        )}
-        {manualResult?.error && (
-          <div className="banner bad" style={{ marginTop: 10, borderRadius: 10 }}>{manualResult.error}</div>
-        )}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>

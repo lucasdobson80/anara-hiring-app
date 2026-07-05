@@ -75,6 +75,7 @@ export async function POST(request) {
 
     let added = 0, rescued = 0, alreadyKnown = 0;
     const addedList = [];
+    const details = [];
     const fresh = [];
     for (const c of candidates) {
       const known = byHandle.get(normHandle(c.handle));
@@ -84,6 +85,7 @@ export async function POST(request) {
         await updateStatus(known.id, "New");
         rescued += 1;
         addedList.push(c.handle);
+        details.push({ handle: c.handle, score: known.score, followers: known.followers ?? c.followers, email: known.email || c.email || null, rescued: true });
       } else {
         alreadyKnown += 1;
       }
@@ -109,6 +111,7 @@ export async function POST(request) {
         );
         added += 1;
         addedList.push(c.handle);
+        details.push({ handle: c.handle, score: s?.score ?? null, followers: c.followers, email: c.email || null, rescued: false });
       }
     }
 
@@ -116,7 +119,7 @@ export async function POST(request) {
     const found = new Set(candidates.map((c) => normHandle(c.handle)));
     const notFound = profiles.filter((p) => !found.has(p));
 
-    return NextResponse.json({ added, rescued, alreadyKnown, notFound, addedList });
+    return NextResponse.json({ added, rescued, alreadyKnown, notFound, addedList, details });
   } catch (e) {
     return NextResponse.json({ error: "manual", message: e.message }, { status: 502 });
   }

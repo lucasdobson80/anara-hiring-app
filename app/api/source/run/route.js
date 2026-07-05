@@ -18,8 +18,8 @@ export async function POST(request) {
   const resultsPerPage = clamp(body.resultsPerPage, 1, 200, 60);
   const days = clamp(body.days, 1, 365, 30);
   const maxItems = clamp(body.maxItems, 10, 1500, 500);
-  const minFollowers = clamp(body.minFollowers, 0, 10_000_000, 1000);
-  const maxFollowers = clamp(body.maxFollowers, minFollowers, 10_000_000, 100000);
+  const minFollowers = clamp(body.minFollowers, 0, 10_000_000, 500);
+  const maxFollowers = clamp(body.maxFollowers, minFollowers, 10_000_000, 15000);
   const threshold = clamp(body.threshold, 60, 85, 70);
   if (!hashtags.length && !searchQueries.length) {
     return NextResponse.json({ error: "bad-request", message: "At least one hashtag or search term is required." }, { status: 400 });

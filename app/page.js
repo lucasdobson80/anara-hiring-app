@@ -8,6 +8,7 @@ import {
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
 import CallsTab from "./calls-tab";
+import OrganicTab from "./organic-tab";
 
 // =============================================================
 // ANARA CASTING DESK — creator sourcing + onboarding cockpit
@@ -177,6 +178,7 @@ export default function AnaraCastingDesk() {
             <h1>Casting Desk</h1>
             <nav className="tabs" aria-label="Sections">
               <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
+              <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
               <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
               <button className={tab === "calls" ? "tab on" : "tab"} onClick={() => setTab("calls")}>Calls</button>
               <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
@@ -288,6 +290,7 @@ export default function AnaraCastingDesk() {
                         <a
                           className="ghost"
                           href={mailtoLink(current.email, firstNameOf(current.name))}
+                          target="_blank" rel="noreferrer"
                           onClick={() => copy("emaildm", dmTemplate(firstNameOf(current.name)))}
                         >
                           {copiedKey === "emaildm" ? "Email opened · DM copied ✓" : "Email + copy DM"}
@@ -303,6 +306,8 @@ export default function AnaraCastingDesk() {
           )}
 
           {tab === "source" && <SourceTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
+
+          {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "calls" && <CallsTab people={[...roster, ...queue]} copy={copy} copiedKey={copiedKey} />}
 
@@ -410,7 +415,7 @@ function StagePack({ stage, first, email, copy, copiedKey }) {
       <p className="soft">Follow them on TikTok first, then DM from your account. Company rule: send the template exactly.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
       <C k="p-dm" text={dmTemplate(first)}>Copy outreach DM</C>
       {email && (
-        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, first)} onClick={() => copy("p-emaildm", dmTemplate(first))}>
+        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, first)} target="_blank" rel="noreferrer" onClick={() => copy("p-emaildm", dmTemplate(first))}>
           {copiedKey === "p-emaildm" ? "Email opened · DM copied ✓" : `Email ${email} + copy DM`}
         </a>
       )}
