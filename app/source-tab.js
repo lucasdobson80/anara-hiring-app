@@ -53,7 +53,7 @@ const fmtWhen = (iso) => {
     " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 };
 
-export default function SourceTab({ onImported }) {
+export default function SourceTab({ onImported, scope = "mine" }) {
   const [status, setStatus] = useState(null); // { ready, spend, runs, estPerResult }
   const [error, setError] = useState(null);
   const [hashtags, setHashtags] = useState(DEFAULT_HASHTAGS);
@@ -118,7 +118,7 @@ export default function SourceTab({ onImported }) {
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/source/status");
+      const res = await fetch(`/api/source/status?scope=${scope}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       setStatus(data);
@@ -128,7 +128,7 @@ export default function SourceTab({ onImported }) {
       setError("Couldn't reach Apify: " + e.message);
       return null;
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
 

@@ -42,9 +42,11 @@ export default function OrganicTab({ onImported }) {
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       setResult(data);
       setText("");
-      if (data.details?.length) {
+      // Log only creators actually added/rescued — not ones already known
+      const logged = (data.details || []).filter((d) => !d.alreadyKnown);
+      if (logged.length) {
         const at = Date.now();
-        const next = [...data.details.map((d) => ({ ...d, at })), ...readLog()];
+        const next = [...logged.map((d) => ({ ...d, at })), ...readLog()];
         writeLog(next);
         setLog(next.slice(0, 100));
       }
@@ -79,6 +81,7 @@ export default function OrganicTab({ onImported }) {
         {result && !result.error && (
           <div className="banner" style={{ marginTop: 10, borderRadius: 10 }}>
             {result.added} added · {result.rescued} rescued from screened/rejected · {result.alreadyKnown} already in the pipeline
+            {result.details?.filter((d) => d.alreadyKnown && d.owner && d.owner !== "lucas").map((d) => ` · @${d.handle} is in ${d.owner}'s pipeline`).join("")}
             {result.notFound?.length > 0 && ` · not found: ${result.notFound.join(", ")}`}
           </div>
         )}

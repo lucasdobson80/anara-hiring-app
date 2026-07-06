@@ -14,14 +14,39 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
-// Shared-password gate for the hosted deployment (HTTP Basic Auth).
-// When APP_PASSWORD is unset (local dev), the app is open.
+// Named users from APP_USERS (e.g. "laia:pw1, alba:pw2"). APP_PASSWORD stays a
+// universal fallback that logs in as "lucas" (preserves the original bookmark).
+function parseUsers() {
+  const map = new Map();
+  for (const pair of String(process.env.APP_USERS || "").split(/[,\n]+/)) {
+    const i = pair.indexOf(":");
+    if (i > 0) {
+      const u = pair.slice(0, i).trim().toLowerCase();
+      const p = pair.slice(i + 1).trim();
+      if (u && p) map.set(u, p);
+    }
+  }
+  return map;
+}
+
+// Forward the resolved username to server routes; overwrite any client-sent
+// value so it can't be spoofed.
+function withUser(request, user) {
+  const h = new Headers(request.headers);
+  h.set("x-cd-user", user);
+  return { request: { headers: h } };
+}
+
 export function middleware(request) {
   const password = process.env.APP_PASSWORD;
-  if (!password) return NextResponse.next();
+  const users = parseUsers();
 
-  // Browsers can attach cached Basic credentials to cross-site requests —
-  // block state-changing CSRF attempts outright.
+  // No auth configured (local dev): open, act as lucas.
+  if (!password && users.size === 0) {
+    return NextResponse.next(withUser(request, "lucas"));
+  }
+
+  // Block cross-site state changes (browsers auto-attach cached Basic creds).
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD" && request.headers.get("sec-fetch-site") === "cross-site") {
     return new NextResponse("Cross-site requests are not allowed", { status: 403 });
@@ -32,11 +57,18 @@ export function middleware(request) {
     try {
       const decoded = atob(auth.slice(6));
       const idx = decoded.indexOf(":");
-      const user = idx === -1 ? decoded : decoded.slice(0, idx);
+      const user = (idx === -1 ? decoded : decoded.slice(0, idx)).toLowerCase();
       const pass = idx === -1 ? "" : decoded.slice(idx + 1);
-      // Accept the password in either field so "anara / <password>" or
-      // just typing it as the username both work.
-      if (safeEqual(user, password) || safeEqual(pass, password)) return NextResponse.next();
+
+      // 1) Named user with a matching password
+      const expected = users.get(user);
+      if (expected && safeEqual(pass, expected)) {
+        return NextResponse.next(withUser(request, user));
+      }
+      // 2) Universal APP_PASSWORD fallback → lucas (either field, legacy)
+      if (password && (safeEqual(pass, password) || safeEqual(user, password))) {
+        return NextResponse.next(withUser(request, "lucas"));
+      }
     } catch {
       // Malformed base64 → fall through to 401 rather than crashing to a 500
     }

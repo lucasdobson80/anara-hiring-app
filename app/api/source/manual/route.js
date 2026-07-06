@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasApifyToken, runSyncItems, aggregateCandidates } from "@/lib/apify";
 import { hasAnthropicKey, scoreCandidates } from "@/lib/scoring";
 import { fetchAllCreators, createCreator, updateStatus, normHandle } from "@/lib/notion";
+import { currentUser } from "@/lib/auth";
 
 // One synchronous scrape of a handful of hand-picked profiles + scoring.
 export const maxDuration = 300;
@@ -50,6 +51,7 @@ export async function POST(request) {
     );
   }
 
+  const owner = await currentUser();
   try {
     const input = {
       resultsPerPage: 6,
@@ -85,9 +87,10 @@ export async function POST(request) {
         await updateStatus(known.id, "New");
         rescued += 1;
         addedList.push(c.handle);
-        details.push({ handle: c.handle, score: known.score, followers: known.followers ?? c.followers, email: known.email || c.email || null, rescued: true });
+        details.push({ handle: c.handle, score: known.score, followers: known.followers ?? c.followers, email: known.email || c.email || null, rescued: true, owner: known.owner || "lucas" });
       } else {
         alreadyKnown += 1;
+        details.push({ handle: c.handle, score: known.score, followers: known.followers, email: known.email, rescued: false, alreadyKnown: true, owner: known.owner || "lucas" });
       }
     }
 
@@ -107,11 +110,12 @@ export async function POST(request) {
           : "Added manually from organic scrolling.";
         await createCreator(
           { ...c, score: s?.score ?? null, rationale, niche: s?.niche || [] },
-          "New"
+          "New",
+          owner
         );
         added += 1;
         addedList.push(c.handle);
-        details.push({ handle: c.handle, score: s?.score ?? null, followers: c.followers, email: c.email || null, rescued: false });
+        details.push({ handle: c.handle, score: s?.score ?? null, followers: c.followers, email: c.email || null, rescued: false, owner });
       }
     }
 

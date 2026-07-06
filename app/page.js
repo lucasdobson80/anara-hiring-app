@@ -47,6 +47,10 @@ export default function AnaraCastingDesk() {
   const [selected, setSelected] = useState(null);
   const [onboardSearch, setOnboardSearch] = useState("");
   const [onboardStage, setOnboardStage] = useState("All");
+  const [onboardOwner, setOnboardOwner] = useState("All");
+  const [user, setUser] = useState(null);
+  const [team, setTeam] = useState(["lucas", "laia", "alba"]);
+  const [scope, setScope] = useState("mine"); // "mine" | "all"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -55,10 +59,10 @@ export default function AnaraCastingDesk() {
   const [syncMsg, setSyncMsg] = useState(null);
   const { copy, copiedKey, fallbackText, setFallbackText } = useCopy();
 
-  const load = useCallback(async ({ keepPending = false } = {}) => {
+  const load = useCallback(async ({ keepPending = false, scope: sc } = {}) => {
     setLoading(true); setError(null); setNeedsSetup(false);
     try {
-      const res = await fetch("/api/pipeline");
+      const res = await fetch(`/api/pipeline?scope=${sc || scope}`);
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "setup") { setNeedsSetup(true); return; }
@@ -67,14 +71,25 @@ export default function AnaraCastingDesk() {
       setQueue(data.queue);
       setRoster(data.roster);
       setCounts(data.counts);
+      if (data.user) setUser(data.user);
+      if (data.team) setTeam(data.team);
       if (!keepPending) setPending({});
       setSelected((s) => (data.roster.some((r) => r.id === s) ? s : null));
     } catch (e) {
       setError("Couldn't load the pipeline from Notion. " + e.message + " — press Reload to retry.");
     } finally { setLoading(false); }
-  }, []);
+  }, [scope]);
 
+  useEffect(() => {
+    try { const s = localStorage.getItem("cd_scope"); if (s === "all" || s === "mine") setScope(s); } catch {}
+  }, []);
   useEffect(() => { load(); }, [load]);
+
+  const switchScope = (s) => {
+    setScope(s);
+    try { localStorage.setItem("cd_scope", s); } catch {}
+    load({ keepPending: pendingCount > 0, scope: s });
+  };
 
   const remaining = queue.filter((c) => !pending[c.id]);
   const current = remaining[0];
@@ -173,7 +188,7 @@ export default function AnaraCastingDesk() {
     <div className="desk">
       <header className="top">
         <div className="brand">
-          <div className="eyebrow">ANARA / CREATOR LEAD</div>
+          <div className="eyebrow">ANARA / {user ? user.toUpperCase() : "CREATOR LEAD"}</div>
           <div className="title-row">
             <h1>Casting Desk</h1>
             <nav className="tabs" aria-label="Sections">
@@ -186,6 +201,10 @@ export default function AnaraCastingDesk() {
           </div>
         </div>
         <div className="top-actions">
+          <div className="scope-toggle">
+            <button className={scope === "mine" ? "on" : ""} onClick={() => switchScope("mine")}>My pipeline</button>
+            <button className={scope === "all" ? "on" : ""} onClick={() => switchScope("all")}>All team</button>
+          </div>
           <button className="ghost" onClick={() => load({ keepPending: pendingCount > 0 })} disabled={loading || syncing}>Reload</button>
           <button className="primary" onClick={sync} disabled={!pendingCount || syncing}>
             {syncing ? "Saving…" : pendingCount ? `Save ${pendingCount} to Notion` : "Nothing to save"}
@@ -228,7 +247,7 @@ export default function AnaraCastingDesk() {
                           <div key={c.id} className={"browse-row" + (verdict === "Approved" ? " ok" : verdict === "Rejected" ? " no" : "")}>
                             <div className="browse-main">
                               <a href={c.link || "#"} target="_blank" rel="noreferrer" className="browse-name">{c.name || c.handle} ↗</a>
-                              <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views</span>
+                              <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views{scope === "all" && c.owner ? ` · ${c.owner}` : ""}</span>
                             </div>
                             <span className="mini-stamp mono">{c.score ?? "–"}</span>
                             {verdict ? (
@@ -260,7 +279,7 @@ export default function AnaraCastingDesk() {
                     <div className="card-head">
                       <div>
                         <div className="name">{current.name || current.handle}</div>
-                        <div className="mono soft">{current.handle} · {current.platform} · {remaining.length} left in queue</div>
+                        <div className="mono soft">{current.handle} · {current.platform} · {remaining.length} left in queue{scope === "all" && current.owner ? ` · ${current.owner}` : ""}</div>
                       </div>
                       <div className="score-stamp"><span>{current.score ?? "–"}</span><label>FIT</label></div>
                     </div>
@@ -305,7 +324,7 @@ export default function AnaraCastingDesk() {
             </>
           )}
 
-          {tab === "source" && <SourceTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
+          {tab === "source" && <SourceTab scope={scope} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
@@ -335,6 +354,16 @@ export default function AnaraCastingDesk() {
                     </button>
                   ))}
                 </div>
+                {scope === "all" && (
+                  <div className="onboard-tools" style={{ marginTop: -6 }}>
+                    <span className="eyebrow" style={{ marginRight: 2 }}>OWNER</span>
+                    {["All", ...team].map((o) => (
+                      <button key={o} className={"chip" + (onboardOwner === o ? " on" : "")} onClick={() => setOnboardOwner(o)}>
+                        {o === "All" ? "All" : o[0].toUpperCase() + o.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="onboard-grid">
                   <div className="roster">
                     {ONBOARD_STAGES.filter((stage) => onboardStage === "All" || onboardStage === stage).map((stage) => {
@@ -342,6 +371,7 @@ export default function AnaraCastingDesk() {
                       const members = roster.filter(
                         (c) =>
                           stageOf(c) === stage &&
+                          (scope !== "all" || onboardOwner === "All" || (c.owner || "lucas") === onboardOwner) &&
                           (!q || (c.name || "").toLowerCase().includes(q) || (c.handle || "").toLowerCase().includes(q))
                       );
                       if (!members.length) return null;
@@ -351,7 +381,10 @@ export default function AnaraCastingDesk() {
                           {members.map((c) => (
                             <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
                               <span className="rname">{c.name || c.handle}</span>
-                              <span className="badge">{stageOf(c)}</span>
+                              <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                {scope === "all" && <span className="owner-tag">{(c.owner || "lucas")[0].toUpperCase()}</span>}
+                                <span className="badge">{stageOf(c)}</span>
+                              </span>
                             </button>
                           ))}
                         </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchAllCreators } from "@/lib/notion";
+import { currentUser, TEAM } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,11 @@ const MOCK = {
   ],
 };
 
-export async function GET() {
+export async function GET(request) {
+  const user = await currentUser();
+  const scope = new URL(request.url).searchParams.get("scope") === "all" ? "all" : "mine";
   if (process.env.MOCK_PIPELINE === "1") {
-    return NextResponse.json(MOCK);
+    return NextResponse.json({ ...MOCK, user, scope, team: TEAM });
   }
   if (!process.env.NOTION_TOKEN) {
     return NextResponse.json(
@@ -34,21 +37,25 @@ export async function GET() {
   }
   try {
     // "Screened" rows are the AI-rejection ledger — dedupe data, not pipeline data
-    const all = (await fetchAllCreators()).filter((c) => c.status !== "Screened");
+    let all = (await fetchAllCreators()).filter((c) => c.status !== "Screened");
+    // Legacy rows with no owner belong to lucas
+    all = all.map((c) => ({ ...c, owner: c.owner || "lucas" }));
+    // "Mine" shows only your creators; "All team" shows everyone's
+    const scoped = scope === "all" ? all : all.filter((c) => c.owner === user);
 
     const counts = {};
-    for (const c of all) {
+    for (const c of scoped) {
       if (c.status) counts[c.status] = (counts[c.status] || 0) + 1;
     }
 
     // Already sorted by Score desc from the Notion query
-    const queue = all.filter((c) => c.status === "New");
+    const queue = scoped.filter((c) => c.status === "New");
 
-    const roster = all
+    const roster = scoped
       .filter((c) => ONBOARD_STAGES.includes(c.status))
       .sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
 
-    return NextResponse.json({ counts, queue, roster });
+    return NextResponse.json({ counts, queue, roster, user, scope, team: TEAM });
   } catch (e) {
     return NextResponse.json(
       { error: "notion", message: e.message || "Notion request failed" },

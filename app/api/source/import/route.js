@@ -4,6 +4,7 @@ import {
 } from "@/lib/apify";
 import { hasAnthropicKey, scoreCandidates } from "@/lib/scoring";
 import { fetchAllCreators, createCreator, handleExists, normHandle } from "@/lib/notion";
+import { currentUser } from "@/lib/auth";
 
 // Scoring + sequential Notion inserts take minutes — use the full window,
 // and cap the per-invocation batch so we never hit the ceiling mid-write.
@@ -54,6 +55,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "bad-request", message: "runId is required." }, { status: 400 });
   }
 
+  const owner = await currentUser();
   let kvId = null;
   let lockTaken = false;
   try {
@@ -136,7 +138,8 @@ export async function POST(request) {
           if (await handleExists(c.handle)) { raceSkipped += 1; continue; }
           await createCreator(
             { ...c, score: s.score, rationale, niche: s.niche },
-            rejected ? "Screened" : "New"
+            rejected ? "Screened" : "New",
+            owner
           );
           if (rejected) screened += 1;
           else inserted += 1;

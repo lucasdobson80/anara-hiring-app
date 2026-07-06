@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasApifyToken, startRun, setRunRecord } from "@/lib/apify";
+import { currentUser } from "@/lib/auth";
 
 const clamp = (v, lo, hi, dflt) => Math.min(Math.max(parseInt(v, 10) || dflt, lo), hi);
 
@@ -24,13 +25,14 @@ export async function POST(request) {
   if (!hashtags.length && !searchQueries.length) {
     return NextResponse.json({ error: "bad-request", message: "At least one hashtag or search term is required." }, { status: 400 });
   }
+  const owner = await currentUser();
   try {
     const run = await startRun({ hashtags, searchQueries, resultsPerPage, days, maxItems });
-    // Persist the run's own import settings next to it, so import (auto or
-    // manual, any device) applies exactly what this run was launched with.
+    // Persist the run's own import settings + owner next to it, so import (auto
+    // or manual, any device) applies exactly what this run was launched with.
     if (run.defaultKeyValueStoreId) {
       await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
-        days, minFollowers, maxFollowers, threshold,
+        days, minFollowers, maxFollowers, threshold, owner,
       }).catch(() => {});
     }
     return NextResponse.json({ id: run.id, status: run.status });
