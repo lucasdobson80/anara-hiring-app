@@ -1,0 +1,5 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Anara">
+  <g transform="rotate(45 256 256)">
+    <path d="M256 36 C 271 192, 320 241, 476 256 C 320 271, 271 320, 256 476 C 241 320, 192 271, 36 256 C 192 241, 241 192, 256 36 Z" fill="#EFEDE6"/>
+  </g>
+</svg>

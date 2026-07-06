@@ -188,9 +188,10 @@ export default function AnaraCastingDesk() {
     <div className="desk">
       <header className="top">
         <div className="brand">
-          <div className="eyebrow">ANARA / {user ? user.toUpperCase() : "CREATOR LEAD"}</div>
           <div className="title-row">
-            <h1>Casting Desk</h1>
+            <img src="/anara-logo.svg" className="brand-logo" alt="Anara" width={30} height={30} />
+            <h1>ANARA Hiring HQ</h1>
+            {user && <span className="signed-in mono" title="Signed in">{user}</span>}
             <nav className="tabs" aria-label="Sections">
               <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
               <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>

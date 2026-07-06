@@ -1,10 +1,10 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Anara Casting Desk",
+  title: "ANARA Hiring HQ",
   description: "Creator sourcing + onboarding cockpit",
   icons: { apple: "/apple-touch-icon.png" },
-  appleWebApp: { capable: true, title: "Casting Desk", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "ANARA Hiring HQ", statusBarStyle: "black-translucent" },
 };
 
 export const viewport = {
