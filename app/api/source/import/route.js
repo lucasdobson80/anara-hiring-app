@@ -97,9 +97,12 @@ export async function POST(request) {
     const items = await getDatasetItems(run.defaultDatasetId);
     const { candidates, filtered, uniqueCreators } = aggregateCandidates(items, { days, minFollowers, maxFollowers });
 
-    // Dedupe by canonical handle against the entire existing database
+    // Dedupe by canonical handle against existing TikTok creators (bulk runs
+    // are TikTok-only; a same-handle Instagram creator is a different person).
     const existing = await fetchAllCreators();
-    const known = new Set(existing.map((c) => normHandle(c.handle)).filter(Boolean));
+    const known = new Set(
+      existing.filter((c) => (c.platform || "TikTok") === "TikTok").map((c) => normHandle(c.handle)).filter(Boolean)
+    );
     const fresh = candidates.filter((c) => !known.has(normHandle(c.handle)));
 
     const batch = fresh.slice(0, BATCH_CAP);
@@ -135,7 +138,7 @@ export async function POST(request) {
         try {
           // Last line of defence against a concurrent import that slipped past
           // the lock: check right before writing.
-          if (await handleExists(c.handle)) { raceSkipped += 1; continue; }
+          if (await handleExists(c.handle, "TikTok")) { raceSkipped += 1; continue; }
           await createCreator(
             { ...c, score: s.score, rationale, niche: s.niche },
             rejected ? "Screened" : "New",

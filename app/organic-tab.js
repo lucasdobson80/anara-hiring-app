@@ -61,15 +61,16 @@ export default function OrganicTab({ onImported }) {
       <div className="card" style={{ padding: "20px 22px", marginBottom: 18 }}>
         <div className="eyebrow">ADD FROM ORGANIC SCROLLING</div>
         <p className="soft" style={{ fontSize: 13.5, margin: "8px 0 0", lineHeight: 1.6 }}>
-          Paste everything you found this session — profile links, video links, or @handles, any mix,
-          separated by new lines, spaces, or commas (up to 30 creators per batch). Each one is scraped
-          for stats and scored for context, then added straight to <b>Review</b>. Your picks always get
-          through — there&apos;s no score bar here, and pasting someone the AI screened out rescues them.
+          Paste everything you found this session — <b>TikTok or Instagram</b> profile links, video/reel
+          links, or @handles, any mix, separated by new lines, spaces, or commas (up to 30 per batch).
+          Each one is scraped for stats and scored for context, then added straight to <b>Review</b>.
+          Your picks always get through — no score bar here, and pasting someone the AI screened out
+          rescues them.
         </p>
         <textarea
           className="input note-area"
           style={{ marginTop: 12, minHeight: 130 }}
-          placeholder={"https://www.tiktok.com/@creator1\nhttps://vm.tiktok.com/ZN…  (video links work too)\n@creator2\ncreator3"}
+          placeholder={"https://www.tiktok.com/@creator1\nhttps://www.instagram.com/creator2\nhttps://www.instagram.com/reel/ABC123  (reel links work too)\n@creator3"}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -100,9 +101,10 @@ export default function OrganicTab({ onImported }) {
         {log.map((e, i) => (
           <div key={`${e.handle}-${e.at}-${i}`} className="call-row">
             <span className={"mini-stamp mono" + (e.score == null ? " miss-stamp" : "")}>{e.score ?? "–"}</span>
-            <a className="browse-name" style={{ flex: 1 }} href={`https://www.tiktok.com/@${String(e.handle).replace(/^@/, "")}`} target="_blank" rel="noreferrer">
+            <a className="browse-name" style={{ flex: 1 }} href={(e.platform === "Instagram" ? "https://www.instagram.com/" : "https://www.tiktok.com/@") + String(e.handle).replace(/^@/, "")} target="_blank" rel="noreferrer">
               @{String(e.handle).replace(/^@/, "")} ↗
             </a>
+            <span className="mono soft" style={{ fontSize: 11.5 }}>{e.platform === "Instagram" ? "IG" : "TT"}</span>
             <span className="mono soft" style={{ fontSize: 12 }}>{fmt(e.followers)} followers</span>
             {e.email && <span className="mono soft" style={{ fontSize: 12 }}>✉</span>}
             {e.rescued && <span className="badge" style={{ color: "#3ECF8E", borderColor: "rgba(62,207,142,.4)" }}>rescued</span>}
