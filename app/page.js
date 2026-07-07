@@ -189,7 +189,7 @@ export default function AnaraCastingDesk() {
       <header className="top">
         <div className="brand">
           <div className="title-row">
-            <img src="/anara-logo.svg" className="brand-logo" alt="Anara" width={30} height={30} />
+            <img src="/anara-logo.svg" className="brand-logo" alt="Anara" width={34} height={34} />
             <h1>ANARA Hiring HQ</h1>
             {user && <span className="signed-in mono" title="Signed in">{user}</span>}
             <nav className="tabs" aria-label="Sections">

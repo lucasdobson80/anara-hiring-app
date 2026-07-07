@@ -115,7 +115,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .scope-toggle button { background: none; border: none; color: #98A0B3; font-family: inherit; font-weight: 600; font-size: 12.5px; padding: 9px 12px; cursor: pointer; }
 .scope-toggle button.on { background: #6E7BFF; color: #0E1014; }
 .owner-tag { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(110,123,255,.18); color: #6E7BFF; font-family: 'Spline Sans Mono', monospace; font-size: 11px; font-weight: 600; }
-.brand-logo { display: block; flex-shrink: 0; }
+.brand-logo { display: block; flex-shrink: 0; border-radius: 9px; align-self: center; box-shadow: 0 2px 10px rgba(0,0,0,.45); }
 .signed-in { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #98A0B3; border: 1px solid #272D3A; border-radius: 999px; padding: 3px 10px; align-self: center; }
 .misses { background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 14px 16px; margin-top: 10px; }
 .miss-row { display: flex; align-items: baseline; gap: 10px; margin-top: 8px; font-size: 13px; }
@@ -140,3 +140,59 @@ select.input { appearance: none; }
 @media (max-width: 780px) { .fields { grid-template-columns: 1fr; } .nl-row { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media (max-width: 780px) { .frame { grid-template-columns: 1fr; } .rail { display: none; } .onboard-grid { grid-template-columns: 1fr; } h1 { font-size: 24px; } }
+
+/* ============================================================
+   Tier 1 polish — depth, motion, spacing rhythm, skeletons.
+   Appended so it layers over the base rules above.
+   ============================================================ */
+:root {
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+  --shadow-2: 0 6px 20px -6px rgba(0,0,0,.5);
+  --shadow-lift: 0 10px 30px -10px rgba(0,0,0,.6);
+}
+
+/* Sticky, subtly frosted header that separates from scrolling content */
+.top {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(14,16,20,.82);
+  backdrop-filter: saturate(1.2) blur(10px);
+  -webkit-backdrop-filter: saturate(1.2) blur(10px);
+  align-items: center;
+}
+h1 { align-self: center; }
+
+/* Motion on every interactive surface (reduced-motion guard already set) */
+.tab, .ghost, .primary, .chip, .approve, .reject, .watch, .scope-toggle button,
+.roster-row, .browse-row, .run-card, .call-row, .res, .stage-row, .score-stamp span, .brand-logo {
+  transition: background-color .16s var(--ease), border-color .16s var(--ease),
+    color .16s var(--ease), transform .14s var(--ease), box-shadow .16s var(--ease), opacity .16s var(--ease);
+}
+.tab:hover:not(.on), .chip:hover:not(.on) { border-color: #3a4256; color: #EFEDE6; }
+.ghost:hover:not(:disabled) { border-color: #3a4256; background: #14171E; }
+.primary:not(:disabled):hover { filter: brightness(1.07); box-shadow: 0 6px 18px -6px rgba(110,123,255,.7); }
+.tab:active, .ghost:active, .primary:active, .chip:active, .approve:active, .reject:active, .watch:active { transform: translateY(1px); }
+.approve:hover { background: rgba(62,207,142,.24); }
+.reject:hover { background: rgba(255,107,94,.22); }
+
+/* Cards & rows get real depth and a gentle lift on hover */
+.card { box-shadow: var(--shadow-2); }
+.roster-row:hover, .browse-row:hover, .call-row:hover, .run-card:hover {
+  border-color: #3a4256; transform: translateY(-1px); box-shadow: var(--shadow-1);
+}
+.roster-row.on { box-shadow: 0 0 0 1px #6E7BFF inset; }
+.score-stamp span { box-shadow: 0 4px 14px -4px rgba(255,229,102,.5); }
+.watch:hover { box-shadow: var(--shadow-1); transform: translateY(-1px); }
+
+/* Funnel rail: a proportion bar under each stage count */
+.stage-row { position: relative; overflow: hidden; }
+.stage-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: #6E7BFF; opacity: .5; transition: width .4s var(--ease); }
+.stage-row.hot .stage-bar { opacity: .85; }
+
+/* Skeleton shimmer for loading states */
+@keyframes cd-shimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+.skeleton-wrap { display: flex; flex-direction: column; gap: 12px; }
+.sk { border-radius: 12px; background: linear-gradient(90deg, #161920 0%, #1e222b 50%, #161920 100%); background-size: 420px 100%; animation: cd-shimmer 1.3s infinite linear; }
+.sk-card { height: 320px; }
+.sk-row { height: 58px; }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
