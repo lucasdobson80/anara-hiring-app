@@ -15,6 +15,11 @@ const PRESETS = {
   "Med & nursing": "medschool, medstudent, nursingschool, nursingstudent, premed, futuredoctor, scrublife, medtok",
 };
 
+// Working UGC creators self-identify with these tags; their follower counts
+// are irrelevant (brands pay for content, not reach).
+const UGC_HASHTAGS = "ugccreator, ugccommunity, ugcportfolio, ugcexample, ugcads, ugccontent, contentcreatorforhire, ugcjourney";
+const UGC_SEARCHES = "ugc portfolio, ugc example ad";
+
 // Follower-band presets: the band is a per-run targeting decision, not a
 // buried number. Wide is the default — scoring sorts out the rest.
 const BANDS = {
@@ -66,6 +71,25 @@ export default function SourceTab({ onImported, scope = "mine" }) {
   const [threshold, setThreshold] = useState(70);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
+  const [ugcMode, setUgcMode] = useState(false);
+
+  const toggleUgcMode = () => {
+    const next = !ugcMode;
+    setUgcMode(next);
+    if (next) {
+      setHashtags(UGC_HASHTAGS);
+      setSearchTerms(UGC_SEARCHES);
+      setMinFollowers(0);
+      setMaxFollowers(1000000);
+      setBriefNote("UGC Hunt: follower counts ignored — scoring judges ad-craft and for-hire signals instead.");
+    } else {
+      setHashtags(DEFAULT_HASHTAGS);
+      setSearchTerms("");
+      setMinFollowers(500);
+      setMaxFollowers(15000);
+      setBriefNote(null);
+    }
+  };
   const suggestNext = async () => {
     setSuggesting(true); setSuggestions(null);
     try {
@@ -185,7 +209,7 @@ export default function SourceTab({ onImported, scope = "mine" }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           hashtags: parsedHashtags, searchQueries: parsedSearchTerms,
-          resultsPerPage, days, maxItems, minFollowers, maxFollowers, threshold,
+          resultsPerPage, days, maxItems, minFollowers, maxFollowers, threshold, ugcMode,
         }),
       });
       const data = await res.json();
@@ -320,6 +344,12 @@ export default function SourceTab({ onImported, scope = "mine" }) {
         {briefNote && <p className="soft" style={{ fontSize: 13, margin: "6px 0 0" }}>{briefNote}</p>}
 
         <div className="preset-row">
+          <button className={"chip ugc-toggle" + (ugcMode ? " on" : "")} onClick={toggleUgcMode}>
+            🎯 UGC Hunt mode {ugcMode ? "ON" : "OFF"}
+          </button>
+          {ugcMode && <span className="soft" style={{ fontSize: 12 }}>hunting working UGC creators — size &amp; ratio ignored, ad-craft and for-hire signals scored</span>}
+        </div>
+        <div className="preset-row">
           <span className="eyebrow" style={{ marginRight: 4 }}>NICHE PRESETS</span>
           {Object.entries(PRESETS).map(([name, tags]) => (
             <button
@@ -397,7 +427,7 @@ export default function SourceTab({ onImported, scope = "mine" }) {
             Based on your real import history (~3–8% of videos survive filtering, dedupe, and the 73+ score bar).
             Yield drops as your database grows — re-running the same hashtags finds fewer new faces.
           </p>
-          {maxFollowers > 0 && maxFollowers < 20000 && (
+          {!ugcMode && maxFollowers > 0 && maxFollowers < 20000 && (
             <p className="band-tip">
               Small-creator band active — good, they reply most. Note hashtag top-posts skew big
               (only ~25–30% of a typical scrape is under 15k), so the discards are the big accounts,
@@ -405,7 +435,7 @@ export default function SourceTab({ onImported, scope = "mine" }) {
               search terms, and a higher videos-per-source to dig past the viral top posts.
             </p>
           )}
-          {offIcpShare(parsedHashtags) > 0.5 && (
+          {!ugcMode && offIcpShare(parsedHashtags) > 0.5 && (
             <p className="off-icp-warn">
               ⚠ Most of these hashtags don&apos;t obviously point at Anara&apos;s audiences (study, students,
               lifestyle, tech, career) or on-camera creators — the forecast may not hold. Very generic tags

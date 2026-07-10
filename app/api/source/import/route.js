@@ -93,6 +93,7 @@ export async function POST(request) {
     const minFollowers = config.minFollowers ?? 1000;
     const maxFollowers = config.maxFollowers ?? 150000;
     const threshold = Math.min(Math.max(config.threshold || body.threshold || 70, 60), 85);
+    const ugcMode = Boolean(config.ugcMode || body.ugcMode);
 
     const items = await getDatasetItems(run.defaultDatasetId);
     const { candidates, filtered, uniqueCreators } = aggregateCandidates(items, { days, minFollowers, maxFollowers });
@@ -119,7 +120,7 @@ export async function POST(request) {
       const chunk = batch.slice(i, i + CHUNK);
       let results;
       try {
-        ({ results } = await scoreCandidates(chunk, threshold));
+        ({ results } = await scoreCandidates(chunk, threshold, { ugcMode }));
       } catch (e) {
         chunkErrors.push(e.message);
         continue;
@@ -135,12 +136,14 @@ export async function POST(request) {
           misses.push({ handle: c.handle, score: s.score, rationale: s.rationale });
         }
         const rationale = s.hard_reject ? `HARD REJECT: ${s.reject_reason || s.rationale}` : s.rationale;
+        // Mechanical for-hire signals guarantee the ugc tag even if the model skips it
+        const niche = [...new Set([...(s.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
         try {
           // Last line of defence against a concurrent import that slipped past
           // the lock: check right before writing.
           if (await handleExists(c.handle, "TikTok")) { raceSkipped += 1; continue; }
           await createCreator(
-            { ...c, score: s.score, rationale, niche: s.niche },
+            { ...c, score: s.score, rationale, niche },
             rejected ? "Screened" : "New",
             owner
           );

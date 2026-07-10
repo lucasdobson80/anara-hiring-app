@@ -133,8 +133,9 @@ export async function POST(request) {
         const rationale = s
           ? `${s.hard_reject ? `⚠ ${s.reject_reason || "flagged"} — ` : ""}${s.rationale} (added manually)`
           : "Added manually from organic scrolling.";
+        const niche = [...new Set([...(s?.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
         await createCreator(
-          { ...c, score: s?.score ?? null, rationale, niche: s?.niche || [] },
+          { ...c, score: s?.score ?? null, rationale, niche },
           "New",
           owner
         );

@@ -196,3 +196,6 @@ h1 { align-self: center; }
 .sk-card { height: 320px; }
 .sk-row { height: 58px; }
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+.ugc-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(110,123,255,.15); color: #6E7BFF; border: 1px solid rgba(110,123,255,.4); border-radius: 999px; padding: 3px 10px; font-family: 'Spline Sans Mono', monospace; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.ugc-toggle { font-weight: 700 !important; }
+.ugc-toggle.on { background: #6E7BFF !important; color: #0E1014 !important; border-color: #6E7BFF !important; }

@@ -22,6 +22,7 @@ export async function POST(request) {
   const minFollowers = clamp(body.minFollowers, 0, 10_000_000, 500);
   const maxFollowers = clamp(body.maxFollowers, minFollowers, 10_000_000, 15000);
   const threshold = clamp(body.threshold, 60, 85, 70);
+  const ugcMode = Boolean(body.ugcMode);
   if (!hashtags.length && !searchQueries.length) {
     return NextResponse.json({ error: "bad-request", message: "At least one hashtag or search term is required." }, { status: 400 });
   }
@@ -32,7 +33,7 @@ export async function POST(request) {
     // or manual, any device) applies exactly what this run was launched with.
     if (run.defaultKeyValueStoreId) {
       await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
-        days, minFollowers, maxFollowers, threshold, owner,
+        days, minFollowers, maxFollowers, threshold, owner, ugcMode,
       }).catch(() => {});
     }
     return NextResponse.json({ id: run.id, status: run.status });

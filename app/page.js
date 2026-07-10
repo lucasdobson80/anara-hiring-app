@@ -250,6 +250,7 @@ export default function AnaraCastingDesk() {
                               <a href={c.link || "#"} target="_blank" rel="noreferrer" className="browse-name">{c.name || c.handle} ↗</a>
                               <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views{scope === "all" && c.owner ? ` · ${c.owner}` : ""}</span>
                             </div>
+                            {c.niche?.includes("ugc") && <span className="ugc-chip">🎯</span>}
                             <span className="mini-stamp mono">{c.score ?? "–"}</span>
                             {verdict ? (
                               <button className="ghost small" onClick={() => setPending((p) => { const n = { ...p }; delete n[c.id]; return n; })}>{verdict} · undo</button>
@@ -282,7 +283,10 @@ export default function AnaraCastingDesk() {
                         <div className="name">{current.name || current.handle}</div>
                         <div className="mono soft">{current.handle} · {current.platform} · {remaining.length} left in queue{scope === "all" && current.owner ? ` · ${current.owner}` : ""}</div>
                       </div>
-                      <div className="score-stamp"><span>{current.score ?? "–"}</span><label>FIT</label></div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                        <div className="score-stamp"><span>{current.score ?? "–"}</span><label>FIT</label></div>
+                        {current.niche?.includes("ugc") && <span className="ugc-chip">🎯 UGC-ready</span>}
+                      </div>
                     </div>
                     <div className="stats">
                       <div><b className="mono">{fmt(current.followers)}</b><label>FOLLOWERS</label></div>
