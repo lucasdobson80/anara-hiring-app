@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { INTERVIEW_INTRO, INTERVIEW_CLOSE } from "@/lib/templates";
 
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 const fmtDay = (iso) => {
@@ -37,27 +36,6 @@ export default function CallsTab({ people, copy, copiedKey }) {
   const [noteTargets, setNoteTargets] = useState({}); // eventId -> pageId
   const [savingNote, setSavingNote] = useState(null);
   const [savedFlash, setSavedFlash] = useState(null);
-  const [schedPerson, setSchedPerson] = useState("");
-  const [schedDay, setSchedDay] = useState("");
-  const [schedTime, setSchedTime] = useState("");
-  const [schedDuration, setSchedDuration] = useState(30);
-  const [scheduling, setScheduling] = useState(false);
-  const [schedMsg, setSchedMsg] = useState(null);
-  const [lastBooked, setLastBooked] = useState(null);
-
-  // Next 14 days as friendly options, and 15-minute slots 08:00-21:00
-  const dayOptions = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow"
-      : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-    return { iso, label };
-  });
-  const timeOptions = [];
-  for (let h = 8; h <= 21; h++) for (const m of [0, 15, 30, 45]) {
-    if (h === 21 && m > 0) continue;
-    timeOptions.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-  }
 
   const load = useCallback(async () => {
     setError(null);
@@ -98,29 +76,6 @@ export default function CallsTab({ people, copy, copiedKey }) {
     } finally { setSavingNote(null); }
   };
 
-  const schedule = async () => {
-    const person = people.find((p) => p.id === schedPerson);
-    if (!person || !schedDay || !schedTime) return;
-    setScheduling(true); setSchedMsg(null); setLastBooked(null);
-    try {
-      const res = await fetch("/api/calls", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: `Anara interview — ${person.name || person.handle}`,
-          startISO: new Date(`${schedDay}T${schedTime}`).toISOString(),
-          durationMins: schedDuration,
-          description: `Creator: ${person.handle || person.name}\nProfile: ${person.link || ""}\nStage: ${person.status}\n\nScheduled from the Casting Desk.`,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      setLastBooked(data);
-      setSchedDay(""); setSchedTime("");
-      await load();
-    } catch (e) {
-      setSchedMsg("Couldn't book it: " + e.message);
-    } finally { setScheduling(false); }
-  };
 
   if (events === null) return <div className="empty">Loading your calendar…</div>;
 
@@ -136,11 +91,6 @@ export default function CallsTab({ people, copy, copiedKey }) {
     </div>
   );
 
-  const interviewees = [...people].sort((a, b) => {
-    const rank = (p) => (p.status === "Replied" ? 0 : p.status === "Interview" ? 1 : 2);
-    return rank(a) - rank(b);
-  });
-
   const byDay = [];
   for (const ev of events) {
     const day = fmtDay(ev.start);
@@ -153,60 +103,11 @@ export default function CallsTab({ people, copy, copiedKey }) {
     <div>
       {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
 
-      <div className="card" style={{ padding: "18px 22px", marginBottom: 18 }}>
-        <div className="eyebrow">SCHEDULE AN INTERVIEW</div>
-        <div className="sched-row">
-          <select className="input" value={schedPerson} onChange={(e) => setSchedPerson(e.target.value)}>
-            <option value="">Pick a creator…</option>
-            {interviewees.map((p) => (
-              <option key={p.id} value={p.id}>{(p.name || p.handle) + " · " + p.status}</option>
-            ))}
-          </select>
-          <select className="input" value={schedDay} onChange={(e) => setSchedDay(e.target.value)}>
-            <option value="">Day…</option>
-            {dayOptions.map((d) => <option key={d.iso} value={d.iso}>{d.label}</option>)}
-          </select>
-          <select className="input" value={schedTime} onChange={(e) => setSchedTime(e.target.value)}>
-            <option value="">Time…</option>
-            {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select className="input" value={schedDuration} onChange={(e) => setSchedDuration(Number(e.target.value))}>
-            {[15, 30, 45, 60].map((m) => <option key={m} value={m}>{m} min</option>)}
-          </select>
-          <button className="primary" onClick={schedule} disabled={scheduling || !schedPerson || !schedDay || !schedTime}>
-            {scheduling ? "Booking…" : "Book + Meet"}
-          </button>
-        </div>
-        {schedMsg && <p className="soft" style={{ fontSize: 13, margin: "8px 0 0" }}>{schedMsg}</p>}
-        {lastBooked && (
-          <div className="booked-box">
-            <div>
-              <div className="eyebrow" style={{ color: "#3ECF8E" }}>BOOKED — {fmtDay(lastBooked.start)} {fmtTime(lastBooked.start)}</div>
-              <div className="mono soft" style={{ fontSize: 12.5, marginTop: 4 }}>{lastBooked.meetLink || "Meet link pending"}</div>
-            </div>
-            {lastBooked.meetLink && (
-              <button className="ghost" onClick={() => copy("booked-meet", lastBooked.meetLink)}>
-                {copiedKey === "booked-meet" ? "Copied ✓" : "Copy Meet link"}
-              </button>
-            )}
-            <a className="ghost" style={{ textDecoration: "none" }} href={lastBooked.calendarLink} target="_blank" rel="noreferrer">Open in Calendar ↗</a>
-          </div>
-        )}
-        <div className="sched-scripts">
-          <button className="chip" onClick={() => copy("call-intro", INTERVIEW_INTRO)}>
-            {copiedKey === "call-intro" ? "Copied ✓" : "Copy intro script"}
-          </button>
-          <button className="chip" onClick={() => copy("call-close", INTERVIEW_CLOSE)}>
-            {copiedKey === "call-close" ? "Copied ✓" : "Copy closing script"}
-          </button>
-        </div>
-      </div>
-
-      <div className="eyebrow" style={{ marginBottom: 8 }}>NEXT TWO WEEKS</div>
+      <div className="eyebrow" style={{ marginBottom: 8 }}>NEXT 30 DAYS</div>
       {events.length === 0 && (
         <div className="empty card">
           <div className="empty-title">No calls on the calendar</div>
-          <div className="soft">Book one above, or send booking links to creators in Replied.</div>
+          <div className="soft">Anything you book in Google Calendar shows up here automatically.</div>
         </div>
       )}
 
@@ -219,8 +120,20 @@ export default function CallsTab({ people, copy, copiedKey }) {
             return (
               <div key={ev.id} className="call-row-wrap">
                 <div className="call-row">
-                  <span className="mono soft call-time">{ev.allDay ? "all day" : fmtTime(ev.start)}</span>
-                  <span className="call-title">{ev.title}</span>
+                  <span className="mono soft call-time">
+                    {ev.allDay ? "all day" : fmtTime(ev.start)}
+                    {ev.durationMins ? <em className="call-dur">{ev.durationMins}m</em> : null}
+                  </span>
+                  <span className="call-title">
+                    {ev.title}
+                    {(ev.attendees?.length > 0 || ev.description) && (
+                      <span className="call-sub soft">
+                        {ev.attendees?.length > 0 && <>with {ev.attendees.join(", ")}</>}
+                        {ev.attendees?.length > 0 && ev.description && " · "}
+                        {ev.description && ev.description.slice(0, 100)}
+                      </span>
+                    )}
+                  </span>
                   {matched && <span className="badge">{matched.name || matched.handle} · {matched.status}</span>}
                   {ev.meetLink && <a className="watch small-join" href={ev.meetLink} target="_blank" rel="noreferrer">Join Meet</a>}
                   {ev.meetLink && (
@@ -271,8 +184,8 @@ export default function CallsTab({ people, copy, copiedKey }) {
         </div>
       ))}
       <p className="hint">
-        Calls match to creators automatically when the event mentions their name or handle — booking through
-        &quot;Book + Meet&quot; always matches. Notes land on the creator&apos;s Notion page under Notes.
+        Calls match to creators automatically when the event title or description mentions their name or
+        handle. Notes land on the creator&apos;s Notion page under Notes.
       </p>
     </div>
   );

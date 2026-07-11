@@ -9,6 +9,7 @@ import {
 import SourceTab from "./source-tab";
 import CallsTab from "./calls-tab";
 import OrganicTab from "./organic-tab";
+import HqTab from "./hq-tab";
 
 // =============================================================
 // ANARA CASTING DESK — creator sourcing + onboarding cockpit
@@ -39,10 +40,11 @@ function useCopy() {
 }
 
 export default function AnaraCastingDesk() {
-  const [tab, setTab] = useState("review");
+  const [tab, setTab] = useState("hq");
   const [queue, setQueue] = useState([]);
   const [roster, setRoster] = useState([]);
   const [counts, setCounts] = useState({});
+  const [weekly, setWeekly] = useState(null);
   const [view, setView] = useState("one"); // "one" | "browse"
   const [selected, setSelected] = useState(null);
   const [onboardSearch, setOnboardSearch] = useState("");
@@ -71,6 +73,7 @@ export default function AnaraCastingDesk() {
       setQueue(data.queue);
       setRoster(data.roster);
       setCounts(data.counts);
+      setWeekly(data.weekly || null);
       if (data.user) setUser(data.user);
       if (data.team) setTeam(data.team);
       if (!keepPending) setPending({});
@@ -193,6 +196,7 @@ export default function AnaraCastingDesk() {
             <h1>ANARA Hiring HQ</h1>
             {user && <span className="signed-in mono" title="Signed in">{user}</span>}
             <nav className="tabs" aria-label="Sections">
+              <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>HQ</button>
               <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
               <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
               <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
@@ -332,6 +336,8 @@ export default function AnaraCastingDesk() {
           {tab === "source" && <SourceTab scope={scope} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
+
+          {tab === "hq" && (loading ? <div className="empty">Loading the week…</div> : <HqTab counts={counts} weekly={weekly} scope={scope} team={team} user={user} />)}
 
           {tab === "calls" && <CallsTab people={[...roster, ...queue]} copy={copy} copiedKey={copiedKey} />}
 

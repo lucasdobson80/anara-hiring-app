@@ -199,3 +199,30 @@ h1 { align-self: center; }
 .ugc-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(110,123,255,.15); color: #6E7BFF; border: 1px solid rgba(110,123,255,.4); border-radius: 999px; padding: 3px 10px; font-family: 'Spline Sans Mono', monospace; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
 .ugc-toggle { font-weight: 700 !important; }
 .ugc-toggle.on { background: #6E7BFF !important; color: #0E1014 !important; border-color: #6E7BFF !important; }
+/* HQ weekly dashboard */
+.hq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.hq-goal, .hq-panel { padding: 20px 22px; }
+.hq-goal-num { display: flex; align-items: baseline; gap: 10px; margin-top: 12px; }
+.hq-goal-num b { font-size: 54px; font-weight: 600; line-height: 1; color: #FFE566; }
+.hq-goal-num span { font-size: 16px; }
+.hq-goal-track { height: 10px; background: #272D3A; border-radius: 999px; margin-top: 16px; overflow: hidden; }
+.hq-goal-fill { height: 100%; background: linear-gradient(90deg, #6E7BFF, #FFE566); border-radius: 999px; transition: width .5s var(--ease); }
+.hq-funnel { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.hq-frow { display: grid; grid-template-columns: 84px 1fr 64px; align-items: center; gap: 10px; }
+.hq-flabel { font-size: 12.5px; color: #98A0B3; }
+.hq-fbars { display: flex; flex-direction: column; gap: 3px; }
+.hq-fbar { height: 8px; border-radius: 999px; min-width: 2px; transition: width .5s var(--ease); }
+.hq-fbar.now { background: #6E7BFF; }
+.hq-fbar.prev { background: #272D3A; height: 5px; }
+.hq-fbar.all { background: #FFE566; opacity: .85; }
+.hq-fnums { font-size: 12.5px; text-align: right; }
+.hq-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+.hq-dot.now { background: #6E7BFF; }
+.hq-dot.prev { background: #272D3A; }
+.hq-team { margin-top: 12px; }
+.hq-trow { display: grid; grid-template-columns: 1fr 70px 80px 60px; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13.5px; }
+.hq-trow.me { background: rgba(110,123,255,.08); }
+.hq-thead { font-size: 10px; color: #98A0B3; letter-spacing: .1em; }
+.hq-trow .mono { text-align: right; }
+.call-dur { display: block; font-style: normal; font-size: 10.5px; color: #4a5162; }
+.call-sub { display: block; font-weight: 400; font-size: 11.5px; margin-top: 2px; }
