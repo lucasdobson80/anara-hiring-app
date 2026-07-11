@@ -96,17 +96,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .forecast { background: #14171E; border: 1px solid #272D3A; border-radius: 12px; padding: 12px 15px; margin-top: 16px; }
 .forecast-line { font-size: 14.5px; margin-top: 6px; line-height: 1.5; }
 .forecast-line b { color: #FFE566; }
-.sched-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.sched-row .input { width: auto; flex: 1; min-width: 140px; }
-.sched-scripts { display: flex; gap: 6px; margin-top: 12px; }
-.day-label { font-family: 'Spline Sans Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #98A0B3; margin: 4px 0 6px; }
-.day-label.hot { color: #FFE566; }
-.call-row-wrap { margin-bottom: 7px; }
-.call-row { display: flex; align-items: center; gap: 12px; background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 11px 14px; flex-wrap: wrap; }
-.call-time { min-width: 52px; font-size: 12.5px; }
-.call-title { flex: 1; font-weight: 700; font-size: 14.5px; min-width: 140px; }
-.small-join { padding: 8px 14px !important; font-size: 13px !important; border-radius: 9px; background: #EFEDE6; color: #0E1014; text-decoration: none; font-weight: 800; }
-.note-box { background: #14171E; border: 1px solid #272D3A; border-top: none; border-radius: 0 0 12px 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; margin: -6px 6px 0; }
 .booked-box { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(62,207,142,.07); border: 1px solid rgba(62,207,142,.35); border-radius: 12px; padding: 12px 15px; margin-top: 12px; }
 .booked-box > div:first-child { flex: 1; min-width: 200px; }
 .off-icp-warn { font-size: 12.5px; color: #FFE566; margin: 8px 0 0; line-height: 1.5; }
@@ -115,7 +104,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .scope-toggle button { background: none; border: none; color: #98A0B3; font-family: inherit; font-weight: 600; font-size: 12.5px; padding: 9px 12px; cursor: pointer; }
 .scope-toggle button.on { background: #6E7BFF; color: #0E1014; }
 .owner-tag { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(110,123,255,.18); color: #6E7BFF; font-family: 'Spline Sans Mono', monospace; font-size: 11px; font-weight: 600; }
-.brand-logo { display: block; flex-shrink: 0; border-radius: 9px; align-self: center; box-shadow: 0 2px 10px rgba(0,0,0,.45); }
 .signed-in { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #98A0B3; border: 1px solid #272D3A; border-radius: 999px; padding: 3px 10px; align-self: center; }
 .misses { background: #161920; border: 1px solid #272D3A; border-radius: 12px; padding: 14px 16px; margin-top: 10px; }
 .miss-row { display: flex; align-items: baseline; gap: 10px; margin-top: 8px; font-size: 13px; }
@@ -164,7 +152,7 @@ h1 { align-self: center; }
 
 /* Motion on every interactive surface (reduced-motion guard already set) */
 .tab, .ghost, .primary, .chip, .approve, .reject, .watch, .scope-toggle button,
-.roster-row, .browse-row, .run-card, .call-row, .res, .stage-row, .score-stamp span, .brand-logo {
+.roster-row, .browse-row, .run-card, .res, .stage-row, .score-stamp span {
   transition: background-color .16s var(--ease), border-color .16s var(--ease),
     color .16s var(--ease), transform .14s var(--ease), box-shadow .16s var(--ease), opacity .16s var(--ease);
 }
@@ -177,7 +165,7 @@ h1 { align-self: center; }
 
 /* Cards & rows get real depth and a gentle lift on hover */
 .card { box-shadow: var(--shadow-2); }
-.roster-row:hover, .browse-row:hover, .call-row:hover, .run-card:hover {
+.roster-row:hover, .browse-row:hover, .run-card:hover {
   border-color: #3a4256; transform: translateY(-1px); box-shadow: var(--shadow-1);
 }
 .roster-row.on { box-shadow: 0 0 0 1px #6E7BFF inset; }
@@ -224,5 +212,3 @@ h1 { align-self: center; }
 .hq-trow.me { background: rgba(110,123,255,.08); }
 .hq-thead { font-size: 10px; color: #98A0B3; letter-spacing: .1em; }
 .hq-trow .mono { text-align: right; }
-.call-dur { display: block; font-style: normal; font-size: 10.5px; color: #4a5162; }
-.call-sub { display: block; font-weight: 400; font-size: 11.5px; margin-top: 2px; }

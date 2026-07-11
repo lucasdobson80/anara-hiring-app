@@ -1,6 +1,0 @@
-<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Anara">
-  <rect width="512" height="512" rx="118" fill="#000000"/>
-  <g transform="rotate(45 256 256)">
-    <path d="M256 101 Q301 211 411 256 Q301 301 256 411 Q211 301 101 256 Q211 211 256 101 Z" fill="#FFFFFF"/>
-  </g>
-</svg>

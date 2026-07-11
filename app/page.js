@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
   firstNameOf, dmTemplate, igWelcome, welcomeEmail, mailtoLink,
   INTERVIEW_INTRO, INTERVIEW_CLOSE, CONTRACT_STEPS, IG_SETUP,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
-import CallsTab from "./calls-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
 
@@ -61,11 +60,16 @@ export default function AnaraCastingDesk() {
   const [syncMsg, setSyncMsg] = useState(null);
   const { copy, copiedKey, fallbackText, setFallbackText } = useCopy();
 
+  // Guards against a slow older fetch overwriting a newer one (e.g. after a
+  // quick scope toggle) — only the latest request may apply its response.
+  const loadSeq = useRef(0);
   const load = useCallback(async ({ keepPending = false, scope: sc } = {}) => {
+    const seq = ++loadSeq.current;
     setLoading(true); setError(null); setNeedsSetup(false);
     try {
       const res = await fetch(`/api/pipeline?scope=${sc || scope}`);
       const data = await res.json();
+      if (seq !== loadSeq.current) return;
       if (!res.ok) {
         if (data.error === "setup") { setNeedsSetup(true); return; }
         throw new Error(data.message || `Request failed (${res.status})`);
@@ -79,14 +83,20 @@ export default function AnaraCastingDesk() {
       if (!keepPending) setPending({});
       setSelected((s) => (data.roster.some((r) => r.id === s) ? s : null));
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       setError("Couldn't load the pipeline from Notion. " + e.message + " — press Reload to retry.");
-    } finally { setLoading(false); }
+    } finally { if (seq === loadSeq.current) setLoading(false); }
   }, [scope]);
 
+  // One fetch on mount, with the remembered scope — setting state first and
+  // letting a scope-dependent effect refetch would race two requests.
   useEffect(() => {
-    try { const s = localStorage.getItem("cd_scope"); if (s === "all" || s === "mine") setScope(s); } catch {}
+    let s = "mine";
+    try { const v = localStorage.getItem("cd_scope"); if (v === "all" || v === "mine") s = v; } catch {}
+    setScope(s);
+    load({ scope: s });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { load(); }, [load]);
 
   const switchScope = (s) => {
     setScope(s);
@@ -192,7 +202,6 @@ export default function AnaraCastingDesk() {
       <header className="top">
         <div className="brand">
           <div className="title-row">
-            <img src="/anara-logo.svg" className="brand-logo" alt="Anara" width={34} height={34} />
             <h1>ANARA Hiring HQ</h1>
             {user && <span className="signed-in mono" title="Signed in">{user}</span>}
             <nav className="tabs" aria-label="Sections">
@@ -200,7 +209,6 @@ export default function AnaraCastingDesk() {
               <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
               <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
               <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
-              <button className={tab === "calls" ? "tab on" : "tab"} onClick={() => setTab("calls")}>Calls</button>
               <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
             </nav>
           </div>
@@ -339,7 +347,6 @@ export default function AnaraCastingDesk() {
 
           {tab === "hq" && (loading ? <div className="empty">Loading the week…</div> : <HqTab counts={counts} weekly={weekly} scope={scope} team={team} user={user} />)}
 
-          {tab === "calls" && <CallsTab people={[...roster, ...queue]} copy={copy} copiedKey={copiedKey} />}
 
           {tab === "onboard" && (
             <>
