@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { IconX, IconUndo } from "./icons";
 
 const DEFAULT_HASHTAGS = "studytok, studytips, studywithme, gradschool, phdlife, gradstudent, thesis, academia";
 
@@ -270,7 +271,14 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
   // works from any tab. This tab only launches, displays, and offers manual
   // import / re-check.
 
-  if (!status && !error) return <div className="empty">Loading sourcing status…</div>;
+  if (!status && !error) return (
+    <div className="skeleton-wrap" aria-label="Loading">
+      <div className="sk sk-bar" />
+      <div className="sk sk-card" />
+      <div className="sk sk-row" />
+      <div className="sk sk-row" />
+    </div>
+  );
 
   if (status && !status.ready.apify) return (
     <div className="empty card">
@@ -483,8 +491,8 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
                 <span className="mono soft run-nums">
                   {r.videos != null ? `${r.videos} videos` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
                 </span>
-                <button className="ghost tiny" title={archived[r.id] ? "Unarchive" : "Archive"} onClick={() => toggleArchived(r.id)}>
-                  {archived[r.id] ? "↩" : "✕"}
+                <button className="ghost tiny" title={archived[r.id] ? "Unarchive" : "Archive"} aria-label={archived[r.id] ? "Unarchive run" : "Archive run"} onClick={() => toggleArchived(r.id)}>
+                  {archived[r.id] ? <IconUndo width={13} height={13} /> : <IconX width={13} height={13} />}
                 </button>
               </div>
               <div className="run-line2">
@@ -549,7 +557,7 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
         Runs you launch here import themselves automatically when the scrape finishes — from any tab, as long
         as the app is open on this device. Candidates are filtered, scored, deduped, and anyone at 73+ lands
         in Review; everyone below the bar is recorded as &quot;Screened&quot; in Notion, so no creator is ever
-        scored twice. ✕ archives a run from this list.
+        scored twice. The ✕ on a run card archives it from this list.
       </p>
     </div>
   );

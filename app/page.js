@@ -9,6 +9,7 @@ import {
 import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
+import { IconX, IconCheck, IconExt } from "./icons";
 
 // =============================================================
 // ANARA CASTING DESK — creator sourcing + onboarding cockpit
@@ -111,6 +112,13 @@ export default function AnaraCastingDesk() {
   // cd_runs_imports), shared with the Source tab.
   const [importToast, setImportToast] = useState(null);
   const [importsVersion, setImportsVersion] = useState(0); // bumps so a mounted Source tab refreshes its run cards
+  // Auto-dismiss: the run card keeps the full summary, so the toast can go
+  const [toastPaused, setToastPaused] = useState(false);
+  useEffect(() => {
+    if (!importToast || toastPaused) return;
+    const t = setTimeout(() => setImportToast(null), 6500);
+    return () => clearTimeout(t);
+  }, [importToast, toastPaused]);
   const watcherBusyRef = useRef(false);
   const loadRef = useRef(null);
   loadRef.current = load;
@@ -302,14 +310,16 @@ export default function AnaraCastingDesk() {
 
       {syncMsg && <div className={"banner" + (/failed/i.test(syncMsg) ? " bad" : "")}>{syncMsg}</div>}
       {importToast && (
-        <div className={"banner toast" + (importToast.bad ? " bad" : "")} role="status">
+        <div
+          className={"banner toast" + (importToast.bad ? " bad" : "")}
+          role="status"
+          aria-live="polite"
+          onMouseEnter={() => setToastPaused(true)}
+          onMouseLeave={() => setToastPaused(false)}
+        >
           <span>{importToast.text}</span>
-          <button
-            onClick={() => setImportToast(null)}
-            aria-label="Dismiss"
-            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}
-          >
-            ✕
+          <button className="icon-btn" onClick={() => setImportToast(null)} aria-label="Dismiss">
+            <IconX />
           </button>
         </div>
       )}
@@ -333,7 +343,11 @@ export default function AnaraCastingDesk() {
                 <button className={view === "browse" ? "chip on" : "chip"} onClick={() => setView("browse")}>Browse all</button>
               </div>
 
-              {loading && <div className="empty">Loading your pipeline from Notion…</div>}
+              {loading && (
+                <div className="skeleton-wrap" aria-label="Loading">
+                  <div className="sk sk-card" />
+                </div>
+              )}
               {!loading && error && <div className="error">{error}</div>}
 
               {!loading && !error && view === "browse" && (
@@ -346,7 +360,7 @@ export default function AnaraCastingDesk() {
                         return (
                           <div key={c.id} className={"browse-row" + (verdict === "Approved" ? " ok" : verdict === "Rejected" ? " no" : "")}>
                             <div className="browse-main">
-                              <a href={c.link || "#"} target="_blank" rel="noreferrer" className="browse-name">{c.name || c.handle} ↗</a>
+                              <a href={c.link || "#"} target="_blank" rel="noreferrer" className="browse-name">{c.name || c.handle} <IconExt width={12} height={12} /></a>
                               <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views{scope === "all" && c.owner ? ` · ${c.owner}` : ""}</span>
                             </div>
                             {c.niche?.includes("ugc") && <span className="ugc-chip">🎯</span>}
@@ -355,8 +369,8 @@ export default function AnaraCastingDesk() {
                               <button className="ghost small" onClick={() => setPending((p) => { const n = { ...p }; delete n[c.id]; return n; })}>{verdict} · undo</button>
                             ) : (
                               <span className="rowbtns">
-                                <button className="approve small" onClick={() => setPending((p) => ({ ...p, [c.id]: "Approved" }))}>✓</button>
-                                <button className="reject small" onClick={() => setPending((p) => ({ ...p, [c.id]: "Rejected" }))}>✕</button>
+                                <button className="approve small" aria-label="Approve" onClick={() => setPending((p) => ({ ...p, [c.id]: "Approved" }))}><IconCheck /></button>
+                                <button className="reject small" aria-label="Reject" onClick={() => setPending((p) => ({ ...p, [c.id]: "Rejected" }))}><IconX /></button>
                               </span>
                             )}
                           </div>
@@ -373,6 +387,11 @@ export default function AnaraCastingDesk() {
                   <div className="empty card">
                     <div className="empty-title">{pendingCount ? "Queue reviewed" : "Queue clear"}</div>
                     <div className="soft">{pendingCount ? "Press Save to push these decisions to Notion." : "No candidates waiting. The next sourcing run refills this queue."}</div>
+                    {!pendingCount && (
+                      <button className="primary empty-cta" onClick={() => setTab("source")}>
+                        Launch a sourcing run <IconExt />
+                      </button>
+                    )}
                   </div>
                 )}
                 {current && (
@@ -381,6 +400,13 @@ export default function AnaraCastingDesk() {
                       <div>
                         <div className="name">{current.name || current.handle}</div>
                         <div className="mono soft">{current.handle} · {current.platform} · {remaining.length} left in queue{scope === "all" && current.owner ? ` · ${current.owner}` : ""}</div>
+                        {current.niche?.filter((n) => n !== "ugc").length > 0 && (
+                          <div className="niche-row">
+                            {current.niche.filter((n) => n !== "ugc").map((n) => (
+                              <span key={n} className="niche-chip">{n}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                         <div className="score-stamp"><span>{current.score ?? "–"}</span><label>FIT</label></div>
@@ -403,7 +429,7 @@ export default function AnaraCastingDesk() {
                       )}
                     </div>
                     <div className="actions">
-                      <a className="watch" href={current.link || "#"} target="_blank" rel="noreferrer">View their profile ↗</a>
+                      <a className="watch" href={current.link || "#"} target="_blank" rel="noreferrer">View their profile <IconExt /></a>
                       <button className="approve" onClick={() => decide("Approved")}>Approve</button>
                       <button className="reject" onClick={() => decide("Rejected")}>Reject</button>
                       <button className="ghost" onClick={() => copy("dm", dmTemplate(firstNameOf(current.name)))}>
@@ -432,16 +458,32 @@ export default function AnaraCastingDesk() {
 
           {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
-          {tab === "hq" && (loading ? <div className="empty">Loading the week…</div> : <HqTab counts={counts} weekly={weekly} scope={scope} team={team} user={user} />)}
+          {tab === "hq" && (loading ? (
+            <div className="hq-grid" aria-label="Loading">
+              <div className="sk sk-panel" />
+              <div className="sk sk-panel" />
+              <div className="sk sk-panel" />
+            </div>
+          ) : <HqTab counts={counts} weekly={weekly} scope={scope} team={team} user={user} />)}
 
 
           {tab === "onboard" && (
             <>
-              {loading && <div className="empty">Loading everyone past review…</div>}
+              {loading && (
+                <div className="skeleton-wrap" aria-label="Loading">
+                  <div className="sk sk-row" />
+                  <div className="sk sk-row" />
+                  <div className="sk sk-row" />
+                  <div className="sk sk-row" />
+                </div>
+              )}
               {!loading && !error && roster.length === 0 && (
                 <div className="empty card">
                   <div className="empty-title">Nobody in play yet</div>
                   <div className="soft">Approve candidates in Review and they&apos;ll appear here with the right resources for each stage.</div>
+                  <button className="primary empty-cta" onClick={() => setTab("review")}>
+                    Go to Review <IconExt />
+                  </button>
                 </div>
               )}
               {!loading && !error && roster.length > 0 && (
@@ -508,11 +550,11 @@ export default function AnaraCastingDesk() {
                           <div className="card-head" style={{ padding: "0 0 12px" }}>
                             <div>
                               <div className="name">{c.name || c.handle}</div>
-                              <a className="mono soft" href={c.link || "#"} target="_blank" rel="noreferrer">{c.handle} ↗</a>
+                              <a className="mono soft" href={c.link || "#"} target="_blank" rel="noreferrer">{c.handle} <IconExt width={12} height={12} /></a>
                             </div>
                             {stage !== "Rejected" && (
                               <button className="reject small" onClick={() => moveStage(c, "Rejected")}>
-                                ✕ Remove
+                                <IconX /> Remove
                               </button>
                             )}
                           </div>
@@ -563,7 +605,7 @@ export default function AnaraCastingDesk() {
 }
 
 function StagePack({ stage, first, email, copy, copiedKey }) {
-  const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} ↗</a>;
+  const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
   );

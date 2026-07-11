@@ -215,3 +215,56 @@ h1 { align-self: center; }
 /* Floating toast: import confirmations must outlive the sticky header */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; width: max-content; max-width: min(92vw, 680px); border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.55); display: flex; align-items: center; gap: 14px; border: 1px solid rgba(62,207,142,.35); }
 .toast.bad { border-color: rgba(255,107,94,.4); }
+
+/* ============================================================
+   Tier A polish — mobile/PWA, skeleton reuse, review card tiles,
+   toast motion, empty-state CTAs. Layers over everything above.
+   ============================================================ */
+
+/* Toast: slide in, sit above the iOS home bar, never touch the edges */
+@keyframes cd-toast-in { from { opacity: 0; transform: translate(-50%, 14px); } }
+.toast { animation: cd-toast-in .25s var(--ease); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); padding-right: 16px; }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.toast .icon-btn { background: none; border: none; color: inherit; cursor: pointer; padding: 6px; margin: -6px; display: inline-flex; }
+
+/* PWA: content clears the notch / status bar in standalone mode */
+.top { padding-top: calc(22px + env(safe-area-inset-top, 0px)); }
+
+/* Review card: followers/views as stat tiles, niche chips */
+.stats { border-bottom: none; gap: 10px; padding: 6px 24px 14px; flex-wrap: wrap; }
+.stats > div { background: #14171E; border: 1px solid #272D3A; border-radius: 10px; padding: 10px 16px; min-width: 120px; }
+.niche-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.niche-chip { font-family: 'Spline Sans Mono', monospace; font-size: 10.5px; letter-spacing: .04em; color: #98A0B3; border: 1px solid #272D3A; background: #14171E; border-radius: 999px; padding: 3px 10px; }
+.score-stamp span { font-size: 32px; }
+
+/* Empty states point somewhere */
+.empty-cta { margin-top: 16px; }
+
+/* Skeleton helpers for the newer views */
+.sk-bar { height: 64px; }
+.sk-panel { height: 230px; }
+
+/* Small screens (iPhone PWA): bigger touch targets, stacked actions */
+@media (max-width: 480px) {
+  .frame { padding: 18px 14px; }
+  .tabs { flex-wrap: wrap; }
+  .top-actions { flex-wrap: wrap; }
+  .top { padding-left: 16px; padding-right: 16px; }
+  .tab { padding: 10px 15px; font-size: 13.5px; }
+  .chip { padding: 9px 13px; }
+  .tiny { padding: 9px 12px !important; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .actions .watch { grid-column: 1 / -1; text-align: center; }
+  .actions .ghost, .actions .approve, .actions .reject { text-align: center; }
+  .stats > div { flex: 1; min-width: 0; }
+  .toast { max-width: calc(100vw - 20px); font-size: 11.5px; }
+  .card-head { padding: 18px 18px 8px; }
+  .body { padding: 14px 18px; }
+  .actions { padding: 14px 18px 18px; }
+  .stats { padding-left: 18px; padding-right: 18px; }
+}
+/* Grid blowout guard: without min-width:0, one unbreakable string (e.g. a
+   run card's long hashtag line) forces the whole page wider than the
+   viewport — grid items refuse to shrink below content by default. */
+.frame > main, .frame > .rail { min-width: 0; }
+.run-tags { max-width: 100%; }
