@@ -104,6 +104,81 @@ export default function AnaraCastingDesk() {
     load({ keepPending: pendingCount > 0, scope: s });
   };
 
+  // ── Background run watcher ─────────────────────────────────────────
+  // Sourcing runs launched from the Source tab are imported HERE, at the
+  // app shell, so the import happens and the confirmation shows no matter
+  // which tab is open. State lives in localStorage (cd_runs_launched /
+  // cd_runs_imports), shared with the Source tab.
+  const [importToast, setImportToast] = useState(null);
+  const [importsVersion, setImportsVersion] = useState(0); // bumps so a mounted Source tab refreshes its run cards
+  const watcherBusyRef = useRef(false);
+  const loadRef = useRef(null);
+  loadRef.current = load;
+  useEffect(() => {
+    const read = (k) => { try { return JSON.parse(localStorage.getItem(k) || "{}"); } catch { return {}; } };
+    const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+    const forget = (id) => { const l = read("cd_runs_launched"); delete l[id]; write("cd_runs_launched", l); };
+
+    const tick = async () => {
+      if (watcherBusyRef.current) return;
+      const launched = read("cd_runs_launched");
+      if (!Object.keys(launched).length) return; // nothing pending — no Apify calls
+      watcherBusyRef.current = true;
+      try {
+        const res = await fetch("/api/source/status?scope=mine");
+        const data = await res.json();
+        if (!res.ok) return;
+        for (const id of Object.keys(launched)) {
+          const run = data.runs?.find((r) => r.id === id);
+          if (!run) { forget(id); continue; } // fell off the recent-runs window
+          if (["RUNNING", "READY"].includes(run.status)) continue; // still scraping
+          if (run.status !== "SUCCEEDED") {
+            forget(id);
+            setImportToast({ bad: true, text: `Sourcing run ${run.status.toLowerCase()} — nothing to import.` });
+            continue;
+          }
+          let summary = run.importResult?.done ? run.importResult.summary : null;
+          if (!summary) {
+            // Import in capped server-side batches until nothing remains
+            let locked = false;
+            for (let pass = 0; pass < 8; pass++) {
+              const r2 = await fetch("/api/source/import", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ runId: id }),
+              });
+              const d2 = await r2.json();
+              if (r2.status === 409) { locked = true; break; } // another device importing — retry next tick
+              if (!r2.ok) throw Object.assign(new Error(d2.message || `Import failed (${r2.status})`), { runId: id });
+              summary = d2;
+              if (!d2.remaining) break;
+            }
+            if (locked) continue;
+          }
+          if (summary) {
+            const im = read("cd_runs_imports");
+            im[id] = { inserted: summary.inserted, screened: summary.screened, alreadyKnown: summary.alreadyKnown, videosFetched: summary.videosFetched, at: Date.now() };
+            write("cd_runs_imports", im);
+            forget(id);
+            setImportToast({
+              bad: false,
+              text: `✓ Sourcing run imported — ${summary.inserted} added to Review · ${summary.screened} screened out · ${summary.alreadyKnown} already known`,
+            });
+            setImportsVersion((v) => v + 1);
+            loadRef.current?.({ keepPending: true });
+          }
+        }
+      } catch (e) {
+        if (e.runId) forget(e.runId); // a failed import must not retry forever
+        setImportToast({ bad: true, text: "Auto-import failed: " + e.message });
+      } finally {
+        watcherBusyRef.current = false;
+      }
+    };
+    tick();
+    const iv = setInterval(tick, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
   const remaining = queue.filter((c) => !pending[c.id]);
   const current = remaining[0];
   const pendingCount = Object.keys(pending).length;
@@ -226,6 +301,18 @@ export default function AnaraCastingDesk() {
       </header>
 
       {syncMsg && <div className={"banner" + (/failed/i.test(syncMsg) ? " bad" : "")}>{syncMsg}</div>}
+      {importToast && (
+        <div className={"banner toast" + (importToast.bad ? " bad" : "")} role="status">
+          <span>{importToast.text}</span>
+          <button
+            onClick={() => setImportToast(null)}
+            aria-label="Dismiss"
+            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit", padding: 0 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="frame">
         <aside className="rail">
@@ -341,7 +428,7 @@ export default function AnaraCastingDesk() {
             </>
           )}
 
-          {tab === "source" && <SourceTab scope={scope} onImported={() => load({ keepPending: pendingCount > 0 })} />}
+          {tab === "source" && <SourceTab scope={scope} refreshKey={importsVersion} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
 

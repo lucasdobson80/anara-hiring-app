@@ -85,11 +85,9 @@ export async function GET(request) {
     // numbers accrue from the day stamping shipped — not retroactively.
     const wkStart = mondayOf(0);
     const nextWk = mondayOf(1);
-    const prevWk = mondayOf(-1);
     const weekly = {
       weekStart: wkStart,
       thisWeek: weeklyFunnel(scoped, wkStart, nextWk),
-      lastWeek: weeklyFunnel(scoped, prevWk, wkStart),
     };
     if (scope === "all") {
       weekly.perOwner = {};

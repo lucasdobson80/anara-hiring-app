@@ -58,7 +58,7 @@ const fmtWhen = (iso) => {
     " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 };
 
-export default function SourceTab({ onImported, scope = "mine" }) {
+export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }) {
   const [status, setStatus] = useState(null); // { ready, spend, runs, estPerResult }
   const [error, setError] = useState(null);
   const [hashtags, setHashtags] = useState(DEFAULT_HASHTAGS);
@@ -125,11 +125,13 @@ export default function SourceTab({ onImported, scope = "mine" }) {
   const importInFlightRef = useRef(false);
   const pollRef = useRef(null);
 
+  // Re-read on refreshKey bumps too — the shell watcher updates these
+  // stores when it finishes an import while this tab is mounted.
   useEffect(() => {
     setArchived(store.read("cd_runs_archived"));
     setImports(store.read("cd_runs_imports"));
     launchedRef.current = store.read("cd_runs_launched");
-  }, []);
+  }, [refreshKey]);
 
   const toggleArchived = (runId) => {
     setArchived((a) => {
@@ -154,7 +156,7 @@ export default function SourceTab({ onImported, scope = "mine" }) {
     }
   }, [scope]);
 
-  useEffect(() => { loadStatus(); }, [loadStatus]);
+  useEffect(() => { loadStatus(); }, [loadStatus, refreshKey]);
 
   // Poll while any run is still going
   useEffect(() => {
@@ -251,23 +253,22 @@ export default function SourceTab({ onImported, scope = "mine" }) {
     } catch (e) {
       setImportResult({ error: e.message });
     } finally {
-      // Success or failure, stop the auto-import loop for this run — a
+      // Success or failure, stop the shell watcher for this run — a
       // persistent error must not retry forever on someone else's dime.
-      delete launchedRef.current[runId];
-      store.write("cd_runs_launched", launchedRef.current);
+      // Read-modify-write so we never resurrect runs the shell watcher
+      // already cleared from the store.
+      const launched = store.read("cd_runs_launched");
+      delete launched[runId];
+      store.write("cd_runs_launched", launched);
+      launchedRef.current = launched;
       importInFlightRef.current = false;
       setImporting(null);
     }
   }, [days, onImported, loadStatus]);
 
-  // Auto-import: a run launched from the app that just reached SUCCEEDED
-  useEffect(() => {
-    if (importing || importInFlightRef.current) return;
-    const ready = status?.runs?.find(
-      (r) => r.status === "SUCCEEDED" && launchedRef.current[r.id] && !imports[r.id] && !r.importResult?.done
-    );
-    if (ready) importRun(ready.id);
-  }, [status, imports, importing, importRun]);
+  // Auto-import of launched runs happens at the app shell (page.js), so it
+  // works from any tab. This tab only launches, displays, and offers manual
+  // import / re-check.
 
   if (!status && !error) return <div className="empty">Loading sourcing status…</div>;
 
@@ -545,10 +546,10 @@ export default function SourceTab({ onImported, scope = "mine" }) {
         <div className="banner bad" style={{ marginTop: 14, borderRadius: 10 }}>Import failed: {importResult.error}</div>
       )}
       <p className="hint">
-        Runs you launch here import themselves automatically when the scrape finishes (keep the tab open) —
-        candidates are filtered, scored, deduped, and anyone at 73+ lands in Review. Everyone scored below the
-        bar is recorded as &quot;Screened&quot; in Notion, so no creator is ever scored twice. ✕ archives a run
-        from this list.
+        Runs you launch here import themselves automatically when the scrape finishes — from any tab, as long
+        as the app is open on this device. Candidates are filtered, scored, deduped, and anyone at 73+ lands
+        in Review; everyone below the bar is recorded as &quot;Screened&quot; in Notion, so no creator is ever
+        scored twice. ✕ archives a run from this list.
       </p>
     </div>
   );

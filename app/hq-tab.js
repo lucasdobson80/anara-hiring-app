@@ -1,11 +1,11 @@
 "use client";
 
-// Weekly command centre: the 5-signings-a-week goal front and centre,
-// this week vs last week's funnel, the all-time pipeline shape, and (in
-// All-team scope) who's doing what. Weekly numbers come from Stage Log
-// stamps, so they accrue from the day that shipped.
+// Weekly command centre: the 10-signings-a-week goal front and centre,
+// this week's funnel, the all-time pipeline shape, and (in All-team
+// scope) who's doing what. Weekly numbers come from Stage Log stamps,
+// so they accrue from the day that shipped.
 
-const WEEKLY_GOAL = 5;
+const WEEKLY_GOAL = 10;
 const FUNNEL = [
   ["sourced", "Sourced"],
   ["approved", "Approved"],
@@ -20,10 +20,9 @@ const daysLeftInWeek = () => 7 - ((new Date().getDay() + 6) % 7); // Mon=7 … S
 
 export default function HqTab({ counts, weekly, scope, team, user }) {
   const tw = weekly?.thisWeek || {};
-  const lw = weekly?.lastWeek || {};
   const signed = tw.signed || 0;
   const pct = Math.min(100, Math.round((signed / WEEKLY_GOAL) * 100));
-  const maxBar = Math.max(1, ...FUNNEL.map(([k]) => Math.max(tw[k] || 0, lw[k] || 0)));
+  const maxBar = Math.max(1, ...FUNNEL.map(([k]) => tw[k] || 0));
   const allTimeMax = Math.max(1, ...ALL_TIME_STAGES.map((s) => counts?.[s] || 0));
 
   return (
@@ -44,21 +43,19 @@ export default function HqTab({ counts, weekly, scope, team, user }) {
         </div>
 
         <div className="card hq-panel">
-          <div className="eyebrow">THIS WEEK VS LAST WEEK</div>
+          <div className="eyebrow">THIS WEEK&apos;S FUNNEL</div>
           <div className="hq-funnel">
             {FUNNEL.map(([k, label]) => (
               <div key={k} className="hq-frow">
                 <span className="hq-flabel">{label}</span>
                 <div className="hq-fbars">
                   <div className="hq-fbar now" style={{ width: `${((tw[k] || 0) / maxBar) * 100}%` }} />
-                  <div className="hq-fbar prev" style={{ width: `${((lw[k] || 0) / maxBar) * 100}%` }} />
                 </div>
-                <span className="mono hq-fnums"><b>{tw[k] || 0}</b><span className="soft"> · {lw[k] || 0}</span></span>
+                <span className="mono hq-fnums"><b>{tw[k] || 0}</b></span>
               </div>
             ))}
           </div>
           <p className="soft" style={{ fontSize: 11.5, margin: "10px 0 0" }}>
-            <span className="hq-dot now" /> this week &nbsp; <span className="hq-dot prev" /> last week ·
             counted from status changes saved in the app
           </p>
         </div>

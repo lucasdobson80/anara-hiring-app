@@ -212,3 +212,6 @@ h1 { align-self: center; }
 .hq-trow.me { background: rgba(110,123,255,.08); }
 .hq-thead { font-size: 10px; color: #98A0B3; letter-spacing: .1em; }
 .hq-trow .mono { text-align: right; }
+/* Floating toast: import confirmations must outlive the sticky header */
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; width: max-content; max-width: min(92vw, 680px); border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.55); display: flex; align-items: center; gap: 14px; border: 1px solid rgba(62,207,142,.35); }
+.toast.bad { border-color: rgba(255,107,94,.4); }
