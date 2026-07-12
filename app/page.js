@@ -146,23 +146,40 @@ export default function AnaraCastingDesk() {
             continue;
           }
           let summary = run.importResult?.done ? run.importResult.summary : null;
+          let unfinished = false;
           if (!summary) {
             // Import in capped server-side batches until nothing remains
-            let locked = false;
-            for (let pass = 0; pass < 8; pass++) {
-              const r2 = await fetch("/api/source/import", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ runId: id }),
-              });
-              const d2 = await r2.json();
-              if (r2.status === 409) { locked = true; break; } // another device importing — retry next tick
-              if (!r2.ok) throw Object.assign(new Error(d2.message || `Import failed (${r2.status})`), { runId: id });
-              summary = d2;
-              if (!d2.remaining) break;
+            try {
+              let locked = false;
+              for (let pass = 0; pass < 10; pass++) {
+                const r2 = await fetch("/api/source/import", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ runId: id }),
+                });
+                const d2 = await r2.json();
+                if (r2.status === 409) { locked = true; break; } // another device importing — retry next tick
+                if (!r2.ok) throw new Error(d2.message || `Import failed (${r2.status})`);
+                summary = d2;
+                if (!d2.remaining) break;
+              }
+              if (locked) continue;
+              unfinished = Boolean(summary?.remaining);
+            } catch (e) {
+              // A pass died (timeout / network). Progress so far is already
+              // checkpointed server-side — retry next tick, give up after 3.
+              const l = read("cd_runs_launched");
+              const tries = ((l[id] && l[id].tries) || 0) + 1;
+              if (tries >= 3) {
+                forget(id);
+                setImportToast({ bad: true, text: `Auto-import failed 3 times: ${e.message} — use "Continue import" on the run card to resume by hand.` });
+              } else {
+                l[id] = { tries };
+                write("cd_runs_launched", l);
+              }
+              continue;
             }
-            if (locked) continue;
           }
-          if (summary) {
+          if (summary && !unfinished) {
             const im = read("cd_runs_imports");
             im[id] = { inserted: summary.inserted, screened: summary.screened, alreadyKnown: summary.alreadyKnown, videosFetched: summary.videosFetched, at: Date.now() };
             write("cd_runs_imports", im);
@@ -174,9 +191,9 @@ export default function AnaraCastingDesk() {
             setImportsVersion((v) => v + 1);
             loadRef.current?.({ keepPending: true });
           }
+          // unfinished: stay in cd_runs_launched — the next tick continues
         }
       } catch (e) {
-        if (e.runId) forget(e.runId); // a failed import must not retry forever
         setImportToast({ bad: true, text: "Auto-import failed: " + e.message });
       } finally {
         watcherBusyRef.current = false;

@@ -10,7 +10,10 @@ import { currentUser } from "@/lib/auth";
 // and cap the per-invocation batch so we never hit the ceiling mid-write.
 export const maxDuration = 300;
 
-const BATCH_CAP = 200; // fresh creators processed per invocation
+// Sized so one invocation always finishes inside Vercel's 300s window:
+// 200 blew past it on big UGC-hunt runs (function killed mid-import, no
+// summary written) — the client loops passes until nothing remains.
+const BATCH_CAP = 60; // fresh creators processed per invocation
 const CHUNK = 20; // candidates per scoring call
 const LOCK_KEY = "CASTING_DESK_LOCK";
 const RESULT_KEY = "CASTING_DESK_IMPORT";
@@ -114,6 +117,23 @@ export async function POST(request) {
     const misses = [];
     const chunkErrors = [];
 
+    // Everything counted so far, merged over any previous pass — written
+    // after every chunk so a timeout or crash still leaves an accurate
+    // "partially imported" record instead of silence.
+    const summarySoFar = () => {
+      misses.sort((a, b) => b.score - a.score);
+      return mergeSummaries(prior?.summary, {
+        videosFetched: items.length,
+        uniqueCreators,
+        preFiltered: filtered,
+        alreadyKnown: candidates.length - fresh.length,
+        scored, hardRejected, belowThreshold, inserted, screened, unscored, raceSkipped,
+        insertFailures,
+        topMisses: misses.slice(0, 5),
+        chunkErrors: chunkErrors.slice(0, 3),
+      });
+    };
+
     // Score and insert chunk by chunk: a late failure can no longer discard
     // paid scoring work, and progress is persisted as it happens.
     for (let i = 0; i < batch.length; i += CHUNK) {
@@ -153,19 +173,11 @@ export async function POST(request) {
           insertFailures.push({ handle: c.handle, message: e.message });
         }
       }
+      // Checkpoint after each chunk — survives a killed function
+      await setRunRecord(kvId, RESULT_KEY, { done: false, at: Date.now(), summary: summarySoFar() }).catch(() => {});
     }
 
-    misses.sort((a, b) => b.score - a.score);
-    const summary = mergeSummaries(prior?.summary, {
-      videosFetched: items.length,
-      uniqueCreators,
-      preFiltered: filtered,
-      alreadyKnown: candidates.length - fresh.length,
-      scored, hardRejected, belowThreshold, inserted, screened, unscored, raceSkipped,
-      insertFailures,
-      topMisses: misses.slice(0, 5),
-      chunkErrors: chunkErrors.slice(0, 3),
-    });
+    const summary = summarySoFar();
     await setRunRecord(kvId, RESULT_KEY, { done: remaining === 0 && chunkErrors.length === 0, at: Date.now(), summary });
 
     return NextResponse.json({ ...summary, remaining });
