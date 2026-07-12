@@ -117,6 +117,7 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
   const [launching, setLaunching] = useState(false);
   const [importing, setImporting] = useState(null); // runId
   const [importResult, setImportResult] = useState(null);
+  const [lockedRuns, setLockedRuns] = useState({}); // runId -> true: import in progress elsewhere
   const [archived, setArchived] = useState({});
   const [imports, setImports] = useState({});
   const [showArchived, setShowArchived] = useState(false);
@@ -159,13 +160,15 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
 
   useEffect(() => { loadStatus(); }, [loadStatus, refreshKey]);
 
-  // Poll while any run is still going
+  // Poll while any run is still going, or while another device holds an
+  // import lock we're waiting out
   useEffect(() => {
-    const hasActive = status?.runs?.some((r) => ["RUNNING", "READY"].includes(r.status));
+    const hasActive = status?.runs?.some((r) => ["RUNNING", "READY"].includes(r.status))
+      || Object.keys(lockedRuns).length > 0;
     clearInterval(pollRef.current);
     if (hasActive) pollRef.current = setInterval(loadStatus, 20000);
     return () => clearInterval(pollRef.current);
-  }, [status, loadStatus]);
+  }, [status, loadStatus, lockedRuns]);
 
   const parsedHashtags = hashtags.split(",").map((h) => h.replace(/^#/, "").trim()).filter(Boolean);
   const parsedSearchTerms = searchTerms.split(",").map((q) => q.trim()).filter(Boolean);
@@ -250,9 +253,16 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
         return next;
       });
       onImported?.();
+      setLockedRuns((s) => { const n = { ...s }; delete n[runId]; return n; });
       await loadStatus();
     } catch (e) {
-      setImportResult({ error: e.message });
+      // The per-run lock means another device (or the background watcher) is
+      // already on it — that's a status, not a failure.
+      if (/already in progress/i.test(e.message)) {
+        setLockedRuns((s) => ({ ...s, [runId]: true }));
+      } else {
+        setImportResult({ error: e.message });
+      }
     } finally {
       // Success or failure, stop the shell watcher for this run — a
       // persistent error must not retry forever on someone else's dime.
@@ -479,6 +489,8 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
           const imp = r.importResult?.summary || imports[r.id];
           const partial = r.importResult && !r.importResult.done;
           const isImporting = importing === r.id;
+          // A finished import supersedes the "locked elsewhere" flag
+          const lockedElsewhere = Boolean(lockedRuns[r.id]) && !(imp && !partial);
           const wasLaunchedHere = Boolean(launchedRef.current[r.id]);
           return (
             <div key={r.id} className={"run-card" + (archived[r.id] ? " dim" : "")}>
@@ -497,18 +509,23 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
               </div>
               <div className="run-line2">
                 {isImporting && <span className="soft run-summary">Scoring… takes a minute or two</span>}
-                {!isImporting && imp && (
+                {!isImporting && lockedElsewhere && (
+                  <span className="soft run-summary">
+                    ⏳ importing on another device{imp ? <> — <b>{imp.inserted} added so far</b> · {imp.screened} screened</> : ""} — updates as it goes
+                  </span>
+                )}
+                {!isImporting && !lockedElsewhere && imp && (
                   <span className="run-summary ok">
                     {partial ? "◐ partially imported" : "✓ imported"} → <b>{imp.inserted} added to Review</b> · {imp.screened} screened out · {imp.alreadyKnown} already known
                   </span>
                 )}
-                {!isImporting && !imp && r.status === "SUCCEEDED" && (
+                {!isImporting && !lockedElsewhere && !imp && r.status === "SUCCEEDED" && (
                   <span className="soft run-summary">{wasLaunchedHere ? "Waiting to auto-import…" : "Not imported yet"}</span>
                 )}
                 {!isImporting && !imp && r.status !== "SUCCEEDED" && (
                   <span className="soft run-summary">{r.status === "RUNNING" || r.status === "READY" ? "Scraping… auto-imports when done" : "Run did not finish"}</span>
                 )}
-                {r.status === "SUCCEEDED" && !isImporting && (
+                {r.status === "SUCCEEDED" && !isImporting && !lockedElsewhere && (
                   <button
                     className="ghost small"
                     onClick={() => importRun(r.id, { force: Boolean(imp) && !partial })}
