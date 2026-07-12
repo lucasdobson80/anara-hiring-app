@@ -112,6 +112,12 @@ export async function POST(request) {
     const batch = fresh.slice(0, BATCH_CAP);
     const remaining = fresh.length - batch.length;
 
+    // Progress for the run card's bar: how many of this run's fresh
+    // creators have been scored, across all passes so far.
+    const priorProcessed = (prior?.summary?.scored || 0) + (prior?.summary?.unscored || 0);
+    const totalToProcess = priorProcessed + fresh.length;
+    const progressNow = (s) => ({ done: (s.scored || 0) + (s.unscored || 0), total: totalToProcess });
+
     let scored = 0, inserted = 0, hardRejected = 0, belowThreshold = 0, screened = 0, unscored = 0, raceSkipped = 0;
     const insertFailures = [];
     const misses = [];
@@ -174,11 +180,17 @@ export async function POST(request) {
         }
       }
       // Checkpoint after each chunk — survives a killed function
-      await setRunRecord(kvId, RESULT_KEY, { done: false, at: Date.now(), summary: summarySoFar() }).catch(() => {});
+      const s = summarySoFar();
+      await setRunRecord(kvId, RESULT_KEY, { done: false, at: Date.now(), progress: progressNow(s), summary: s }).catch(() => {});
     }
 
     const summary = summarySoFar();
-    await setRunRecord(kvId, RESULT_KEY, { done: remaining === 0 && chunkErrors.length === 0, at: Date.now(), summary });
+    await setRunRecord(kvId, RESULT_KEY, {
+      done: remaining === 0 && chunkErrors.length === 0,
+      at: Date.now(),
+      progress: progressNow(summary),
+      summary,
+    });
 
     return NextResponse.json({ ...summary, remaining });
   } catch (e) {

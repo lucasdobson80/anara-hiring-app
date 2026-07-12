@@ -33,7 +33,7 @@ export async function GET(request) {
           hashtags: input?.hashtags || [],
           videos: dataset?.itemCount ?? null,
           // Server-side import state: shared across devices, unlike localStorage
-          importResult: importRecord ? { done: importRecord.done, at: importRecord.at, summary: importRecord.summary } : null,
+          importResult: importRecord ? { done: importRecord.done, at: importRecord.at, progress: importRecord.progress || null, summary: importRecord.summary } : null,
         };
       })
     );

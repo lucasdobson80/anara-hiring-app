@@ -268,3 +268,7 @@ h1 { align-self: center; }
    viewport — grid items refuse to shrink below content by default. */
 .frame > main, .frame > .rail { min-width: 0; }
 .run-tags { max-width: 100%; }
+/* Run-card import progress bar (fed by per-chunk server checkpoints) */
+.run-working { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.run-progress { display: inline-block; width: 130px; height: 6px; background: #272D3A; border-radius: 999px; overflow: hidden; flex-shrink: 0; }
+.run-progress-fill { display: block; height: 100%; background: linear-gradient(90deg, #6E7BFF, #FFE566); border-radius: 999px; transition: width .6s var(--ease); }

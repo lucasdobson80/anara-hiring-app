@@ -160,15 +160,19 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
 
   useEffect(() => { loadStatus(); }, [loadStatus, refreshKey]);
 
-  // Poll while any run is still going, or while another device holds an
-  // import lock we're waiting out
+  // Poll while any run is still scraping, an import is running (here or on
+  // another device — the checkpoints feed the progress bar), or a partial
+  // import is fresh enough to still be alive.
   useEffect(() => {
-    const hasActive = status?.runs?.some((r) => ["RUNNING", "READY"].includes(r.status))
-      || Object.keys(lockedRuns).length > 0;
+    const now = Date.now();
+    const hasActive = status?.runs?.some((r) =>
+      ["RUNNING", "READY"].includes(r.status) ||
+      (r.importResult && !r.importResult.done && r.importResult.at && now - r.importResult.at < 3 * 60_000)
+    ) || Object.keys(lockedRuns).length > 0 || importing !== null;
     clearInterval(pollRef.current);
-    if (hasActive) pollRef.current = setInterval(loadStatus, 20000);
+    if (hasActive) pollRef.current = setInterval(loadStatus, 15000);
     return () => clearInterval(pollRef.current);
-  }, [status, loadStatus, lockedRuns]);
+  }, [status, loadStatus, lockedRuns, importing]);
 
   const parsedHashtags = hashtags.split(",").map((h) => h.replace(/^#/, "").trim()).filter(Boolean);
   const parsedSearchTerms = searchTerms.split(",").map((q) => q.trim()).filter(Boolean);
@@ -489,8 +493,14 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
           const imp = r.importResult?.summary || imports[r.id];
           const partial = r.importResult && !r.importResult.done;
           const isImporting = importing === r.id;
+          // Checkpoints are written every ~30s while an import runs, so a
+          // fresh partial record means someone is actively importing — a
+          // stale one means it crashed and needs "Continue import".
+          const activeElsewhere = !isImporting && partial && r.importResult?.at && Date.now() - r.importResult.at < 3 * 60_000;
           // A finished import supersedes the "locked elsewhere" flag
-          const lockedElsewhere = Boolean(lockedRuns[r.id]) && !(imp && !partial);
+          const lockedElsewhere = (Boolean(lockedRuns[r.id]) || activeElsewhere) && !(imp && !partial);
+          const prog = r.importResult?.progress;
+          const pct = prog?.total > 0 ? Math.min(100, Math.round((prog.done / prog.total) * 100)) : null;
           const wasLaunchedHere = Boolean(launchedRef.current[r.id]);
           return (
             <div key={r.id} className={"run-card" + (archived[r.id] ? " dim" : "")}>
@@ -508,10 +518,16 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
                 </button>
               </div>
               <div className="run-line2">
-                {isImporting && <span className="soft run-summary">Scoring… takes a minute or two</span>}
+                {isImporting && (
+                  <span className="soft run-summary run-working">
+                    <span className="run-progress"><span className="run-progress-fill" style={{ width: `${pct ?? 8}%` }} /></span>
+                    {pct != null ? `Scoring ${prog.done} of ${prog.total} creators…` : "Scoring… first results in ~1 min"}
+                  </span>
+                )}
                 {!isImporting && lockedElsewhere && (
-                  <span className="soft run-summary">
-                    ⏳ importing on another device{imp ? <> — <b>{imp.inserted} added so far</b> · {imp.screened} screened</> : ""} — updates as it goes
+                  <span className="soft run-summary run-working">
+                    <span className="run-progress"><span className="run-progress-fill" style={{ width: `${pct ?? 8}%` }} /></span>
+                    ⏳ importing{pct != null ? ` — ${prog.done} of ${prog.total} scored` : ""}{imp?.inserted != null ? <> · <b>{imp.inserted} added so far</b></> : null}
                   </span>
                 )}
                 {!isImporting && !lockedElsewhere && imp && (
