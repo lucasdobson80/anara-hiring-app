@@ -9,14 +9,29 @@ export const maxDuration = 300;
 
 const MAX_PROFILES = 30;
 
+// LinkedIn profiles are tracked bookmarks: no scraping (LinkedIn blocks
+// it, and there are no content stats to score anyway) — the person was
+// judged by eye while scrolling. Name is prettified from the URL slug.
+function linkedInName(slug) {
+  const words = decodeURIComponent(slug)
+    .split("-")
+    .filter((w) => w && !/\d/.test(w)) // drop the trailing id junk (jane-doe-1a2b3c)
+    .map((w) => w[0].toUpperCase() + w.slice(1));
+  return words.length ? words.join(" ") : slug;
+}
+
 // Accepts pasted TikTok or Instagram profile links, video/reel links,
-// @handles, or bare handles (bare handles are treated as TikTok).
+// @handles, bare handles (treated as TikTok), or LinkedIn profile links.
 function parseInput(text) {
   const profiles = new Set();   // TikTok usernames
   const postURLs = new Set();   // TikTok video URLs
   const igUsernames = new Set();
   const igPostUrls = new Set();
+  const liProfiles = new Set(); // LinkedIn /in/ slugs
   for (const token of String(text).split(/[\s,]+/).filter(Boolean)) {
+    // --- LinkedIn ---
+    const li = token.match(/linkedin\.com\/in\/([A-Za-z0-9\-_%.]+)/i);
+    if (li) { liProfiles.add(li[1].replace(/\/+$/, "").toLowerCase()); continue; }
     // --- Instagram ---
     if (/instagram\.com\/(?:reel|reels|p|tv)\//i.test(token)) { igPostUrls.add(token.split("?")[0]); continue; }
     const ig = token.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
@@ -37,6 +52,7 @@ function parseInput(text) {
     postURLs: [...postURLs].slice(0, MAX_PROFILES),
     igUsernames: [...igUsernames].slice(0, MAX_PROFILES),
     igPostUrls: [...igPostUrls].slice(0, MAX_PROFILES),
+    liProfiles: [...liProfiles].slice(0, MAX_PROFILES),
   };
 }
 
@@ -53,10 +69,10 @@ export async function POST(request) {
   } catch {
     return NextResponse.json({ error: "bad-request", message: "Invalid JSON body." }, { status: 400 });
   }
-  const { profiles, postURLs, igUsernames, igPostUrls } = parseInput(body.text || "");
-  if (!profiles.length && !postURLs.length && !igUsernames.length && !igPostUrls.length) {
+  const { profiles, postURLs, igUsernames, igPostUrls, liProfiles } = parseInput(body.text || "");
+  if (!profiles.length && !postURLs.length && !igUsernames.length && !igPostUrls.length && !liProfiles.length) {
     return NextResponse.json(
-      { error: "bad-request", message: "No TikTok or Instagram profiles / video links recognised in the input." },
+      { error: "bad-request", message: "No TikTok, Instagram, or LinkedIn profiles / video links recognised in the input." },
       { status: 400 }
     );
   }
@@ -93,6 +109,19 @@ export async function POST(request) {
       candidates.push(...ig);
     }
 
+    // LinkedIn: tracked bookmarks — no scrape, no score, straight to Review
+    for (const slug of liProfiles) {
+      candidates.push({
+        handle: slug,
+        name: linkedInName(slug),
+        platform: "LinkedIn",
+        profileUrl: `https://www.linkedin.com/in/${slug}/`,
+        followers: null,
+        maxViews: null,
+        email: null,
+      });
+    }
+
     const existing = await fetchAllCreators();
     // Platform-aware key: the same @handle can be different people on TikTok
     // vs Instagram, so dedupe must not collapse them.
@@ -121,16 +150,20 @@ export async function POST(request) {
 
     if (fresh.length) {
       // Score for the review card, but insert regardless of the bar —
-      // manual picks always reach human review.
+      // manual picks always reach human review. LinkedIn adds have no
+      // content stats to grade, so they skip scoring entirely.
+      const toScore = fresh.filter((c) => c.platform !== "LinkedIn");
       let results = new Map();
       try {
-        ({ results } = await scoreCandidates(fresh, 70));
+        if (toScore.length) ({ results } = await scoreCandidates(toScore, 70));
       } catch {
         // scoring is best-effort here; still add the creators
       }
       for (const c of fresh) {
         const s = results.get(normHandle(c.handle));
-        const rationale = s
+        const rationale = c.platform === "LinkedIn"
+          ? "Added from LinkedIn — no content stats to score; judged by eye while scrolling."
+          : s
           ? `${s.hard_reject ? `⚠ ${s.reject_reason || "flagged"} — ` : ""}${s.rationale} (added manually)`
           : "Added manually from organic scrolling.";
         const niche = [...new Set([...(s?.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
