@@ -4,8 +4,8 @@ import { currentUser, TEAM } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const ONBOARD_STAGES = ["Approved", "Contacted", "Replied", "Interview", "Trial", "Signed"];
-const FUNNEL_STAGES = ["Approved", "Rejected", "Contacted", "Replied", "Interview", "Trial", "Signed"];
+const ONBOARD_STAGES = ["Approved", "Contacted", "Replied", "Interview", "Signed"];
+const FUNNEL_STAGES = ["Approved", "Rejected", "Contacted", "Replied", "Interview", "Signed"];
 
 // Monday-start week bucket for a YYYY-MM-DD string
 function mondayOf(offsetWeeks = 0) {
@@ -94,7 +94,7 @@ export async function GET(request) {
       for (const member of TEAM) {
         const own = scoped.filter((c) => c.owner === member);
         const wk = weeklyFunnel(own, wkStart, nextWk);
-        weekly.perOwner[member] = { contacted: wk.contacted, signed: wk.signed, sourced: wk.sourced };
+        weekly.perOwner[member] = { contacted: wk.contacted, interview: wk.interview, signed: wk.signed };
       }
     }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateStatus } from "@/lib/notion";
 
-const STAGES = ["New", "Approved", "Rejected", "Contacted", "Replied", "Interview", "Trial", "Signed"];
+const STAGES = ["New", "Approved", "Rejected", "Contacted", "Replied", "Interview", "Signed"];
 
 export async function PATCH(request) {
   if (process.env.MOCK_PIPELINE === "1") {

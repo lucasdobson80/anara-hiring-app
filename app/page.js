@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, dmTemplate, igWelcome, welcomeEmail, mailtoLink,
+  firstNameOf, renderDm, DEFAULT_DM, igWelcome, welcomeEmail, mailtoLink,
   INTERVIEW_INTRO, INTERVIEW_CLOSE, CONTRACT_STEPS, IG_SETUP,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
@@ -60,6 +60,33 @@ export default function AnaraCastingDesk() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
   const { copy, copiedKey, fallbackText, setFallbackText } = useCopy();
+
+  // Personal outreach DM: every account has its own template ({first} token),
+  // fetched once and used by every copy-DM / email button.
+  const [dmTpl, setDmTpl] = useState(null);
+  const [dmOpen, setDmOpen] = useState(false);
+  const [dmDraft, setDmDraft] = useState("");
+  const [dmSaving, setDmSaving] = useState(false);
+  const [dmErr, setDmErr] = useState(null);
+  useEffect(() => {
+    fetch("/api/settings/dm").then((r) => r.json()).then((d) => { if (d.template) setDmTpl(d.template); }).catch(() => {});
+  }, []);
+  const dmFor = useCallback((first) => renderDm(dmTpl, first), [dmTpl]);
+  const saveDm = async () => {
+    setDmSaving(true); setDmErr(null);
+    try {
+      const res = await fetch("/api/settings/dm", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template: dmDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      setDmTpl(data.template);
+      setDmOpen(false);
+    } catch (e) {
+      setDmErr(e.message);
+    } finally { setDmSaving(false); }
+  };
 
   // Guards against a slow older fetch overwriting a newer one (e.g. after a
   // quick scope toggle) — only the latest request may apply its response.
@@ -358,6 +385,9 @@ export default function AnaraCastingDesk() {
               <div className="viewtoggle">
                 <button className={view === "one" ? "chip on" : "chip"} onClick={() => setView("one")}>One by one</button>
                 <button className={view === "browse" ? "chip on" : "chip"} onClick={() => setView("browse")}>Browse all</button>
+                <button className="chip" style={{ marginLeft: "auto" }} onClick={() => { setDmDraft(dmTpl || DEFAULT_DM); setDmErr(null); setDmOpen(true); }}>
+                  Edit my DM
+                </button>
               </div>
 
               {loading && (
@@ -449,15 +479,15 @@ export default function AnaraCastingDesk() {
                       <a className="watch" href={current.link || "#"} target="_blank" rel="noreferrer">View their profile <IconExt /></a>
                       <button className="approve" onClick={() => decide("Approved")}>Approve</button>
                       <button className="reject" onClick={() => decide("Rejected")}>Reject</button>
-                      <button className="ghost" onClick={() => copy("dm", dmTemplate(firstNameOf(current.name)))}>
+                      <button className="ghost" onClick={() => copy("dm", dmFor(firstNameOf(current.name)))}>
                         {copiedKey === "dm" ? "Copied ✓" : "Copy outreach DM"}
                       </button>
                       {current.email && (
                         <a
                           className="ghost"
-                          href={mailtoLink(current.email, firstNameOf(current.name))}
+                          href={mailtoLink(current.email, dmFor(firstNameOf(current.name)))}
                           target="_blank" rel="noreferrer"
-                          onClick={() => copy("emaildm", dmTemplate(firstNameOf(current.name)))}
+                          onClick={() => copy("emaildm", dmFor(firstNameOf(current.name)))}
                         >
                           {copiedKey === "emaildm" ? "Email opened · DM copied ✓" : "Email + copy DM"}
                         </a>
@@ -593,7 +623,7 @@ export default function AnaraCastingDesk() {
                                   <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{s}</button>
                                 ))}
                               </div>
-                              <StagePack stage={stage} first={first} email={c.email} copy={copy} copiedKey={copiedKey} />
+                              <StagePack stage={stage} first={first} email={c.email} copy={copy} copiedKey={copiedKey} dmFor={dmFor} />
                             </>
                           )}
                         </div>
@@ -617,11 +647,33 @@ export default function AnaraCastingDesk() {
           </div>
         </div>
       )}
+
+      {dmOpen && (
+        <div className="modal-back" onClick={() => setDmOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="eyebrow">MY OUTREACH DM ({(user || "me").toUpperCase()})</div>
+            <p className="soft" style={{ fontSize: 13, margin: 0, lineHeight: 1.55 }}>
+              This is what your Copy outreach DM and email buttons send. Write <span className="mono">{"{first}"}</span>{" "}
+              wherever the creator&apos;s first name should go (becomes &quot;there&quot; when we don&apos;t have one).
+              Keep blank lines between paragraphs — they survive the copy.
+            </p>
+            <textarea value={dmDraft} onChange={(e) => setDmDraft(e.target.value)} />
+            {dmErr && <div className="banner bad" style={{ borderRadius: 10 }}>{dmErr}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button className="ghost" onClick={() => setDmDraft(DEFAULT_DM)}>Reset to company default</button>
+              <button className="ghost" onClick={() => setDmOpen(false)}>Cancel</button>
+              <button className="primary" onClick={saveDm} disabled={dmSaving || !dmDraft.trim()}>
+                {dmSaving ? "Saving…" : "Save my DM"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StagePack({ stage, first, email, copy, copiedKey }) {
+function StagePack({ stage, first, email, copy, copiedKey, dmFor }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -629,10 +681,10 @@ function StagePack({ stage, first, email, copy, copiedKey }) {
   if (stage === "Approved") return (
     <div className="pack">
       <div className="eyebrow">NEXT MOVE: SEND THE DM{email ? " + EMAIL" : ""}</div>
-      <p className="soft">Follow them on TikTok first, then DM from your account. Company rule: send the template exactly.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
-      <C k="p-dm" text={dmTemplate(first)}>Copy outreach DM</C>
+      <p className="soft">Follow them on TikTok first, then DM from your account — your personal template, editable under Review → Edit my DM.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
+      <C k="p-dm" text={dmFor(first)}>Copy outreach DM</C>
       {email && (
-        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, first)} target="_blank" rel="noreferrer" onClick={() => copy("p-emaildm", dmTemplate(first))}>
+        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, dmFor(first))} target="_blank" rel="noreferrer" onClick={() => copy("p-emaildm", dmFor(first))}>
           {copiedKey === "p-emaildm" ? "Email opened · DM copied ✓" : `Email ${email} + copy DM`}
         </a>
       )}
@@ -661,13 +713,13 @@ function StagePack({ stage, first, email, copy, copiedKey }) {
       <C k="p-intro" text={INTERVIEW_INTRO}>Copy intro script + non-compete check</C>
       <C k="p-close" text={INTERVIEW_CLOSE}>Copy closing script</C>
       <L href={LINKS.interviewSlides}>Interview slides</L>
-      <p className="soft">Get their full name in the chat before the call ends — you need it for the contract. Then move them to Trial and run onboarding immediately.</p>
+      <p className="soft">Get their full name in the chat before the call ends — you need it for the contract. Then move them to Signed and run onboarding immediately.</p>
     </div>
   );
-  // Trial + Signed share the onboarding pack
+  // Signed: the onboarding pack
   return (
     <div className="pack">
-      <div className="eyebrow">{stage === "Trial" ? "ONBOARD NOW — DO THIS RIGHT AFTER THE CALL" : "SIGNED — ONBOARDING PACK"}</div>
+      <div className="eyebrow">SIGNED — ONBOARD NOW, RIGHT AFTER THE CALL</div>
       <div className="packsec">1 · Tracker</div>
       <p className="soft">Add a row with full name + all fields. Assign the team lead with the smaller column (Chart view), matching postgrad vs undergrad fit. Leave the tax column to Alba.</p>
       <L href={LINKS.tracker}>Creator Tracker</L>
@@ -685,7 +737,7 @@ function StagePack({ stage, first, email, copy, copiedKey }) {
       <L href={LINKS.onboardingChecklist}>Onboarding Checklist</L>
       <L href={LINKS.demoGuide}>Product demo guide</L>
       <L href={LINKS.guide}>Full hiring guide</L>
-      {stage === "Signed" && <p className="soft">They join the weekly Tuesday group meeting after their trial week.</p>}
+      <p className="soft">They join the weekly Tuesday group meeting after their trial week.</p>
     </div>
   );
 }

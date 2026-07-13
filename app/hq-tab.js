@@ -6,15 +6,16 @@
 // so they accrue from the day that shipped.
 
 const WEEKLY_GOAL = 10;
+// Sourced is deliberately absent — it's 10-20x the other stages and lives
+// in Source; the funnel tracks the human pipeline from Approved onward.
 const FUNNEL = [
-  ["sourced", "Sourced"],
   ["approved", "Approved"],
   ["contacted", "Contacted"],
   ["replied", "Replied"],
   ["interview", "Interview"],
   ["signed", "Signed"],
 ];
-const ALL_TIME_STAGES = ["New", "Approved", "Contacted", "Replied", "Interview", "Trial", "Signed", "Rejected"];
+const ALL_TIME_STAGES = ["New", "Approved", "Contacted", "Replied", "Interview", "Signed", "Rejected"];
 
 const daysLeftInWeek = () => 7 - ((new Date().getDay() + 6) % 7); // Mon=7 … Sun=1
 
@@ -80,13 +81,13 @@ export default function HqTab({ counts, weekly, scope, team, user }) {
             <div className="eyebrow">TEAM THIS WEEK</div>
             <div className="hq-team">
               <div className="hq-trow hq-thead">
-                <span></span><span className="mono">sourced</span><span className="mono">contacted</span><span className="mono">signed</span>
+                <span></span><span className="mono">contacted</span><span className="mono">interview</span><span className="mono">signed</span>
               </div>
               {team.map((m) => (
                 <div key={m} className={"hq-trow" + (m === user ? " me" : "")}>
                   <span style={{ textTransform: "capitalize" }}>{m}</span>
-                  <span className="mono">{weekly.perOwner[m]?.sourced ?? 0}</span>
                   <span className="mono">{weekly.perOwner[m]?.contacted ?? 0}</span>
+                  <span className="mono">{weekly.perOwner[m]?.interview ?? 0}</span>
                   <span className="mono"><b>{weekly.perOwner[m]?.signed ?? 0}</b></span>
                 </div>
               ))}
