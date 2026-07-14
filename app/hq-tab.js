@@ -5,7 +5,9 @@
 // scope) who's doing what. Weekly numbers come from Stage Log stamps,
 // so they accrue from the day that shipped.
 
-const WEEKLY_GOAL = 10;
+// Per-person weekly signing goal; the All-team goal scales with headcount
+// (accounts × 10), so it adjusts itself when the team grows.
+const GOAL_PER_PERSON = 10;
 // Sourced is deliberately absent — it's 10-20x the other stages and lives
 // in Source; the funnel tracks the human pipeline from Approved onward.
 const FUNNEL = [
@@ -22,7 +24,8 @@ const daysLeftInWeek = () => 7 - ((new Date().getDay() + 6) % 7); // Mon=7 … S
 export default function HqTab({ counts, weekly, scope, team, user }) {
   const tw = weekly?.thisWeek || {};
   const signed = tw.signed || 0;
-  const pct = Math.min(100, Math.round((signed / WEEKLY_GOAL) * 100));
+  const goal = scope === "all" ? (team?.length || 1) * GOAL_PER_PERSON : GOAL_PER_PERSON;
+  const pct = Math.min(100, Math.round((signed / goal) * 100));
   const maxBar = Math.max(1, ...FUNNEL.map(([k]) => tw[k] || 0));
   const allTimeMax = Math.max(1, ...ALL_TIME_STAGES.map((s) => counts?.[s] || 0));
 
@@ -33,13 +36,13 @@ export default function HqTab({ counts, weekly, scope, team, user }) {
           <div className="eyebrow">THIS WEEK&apos;S GOAL{scope === "all" ? " · ALL TEAM" : ""}</div>
           <div className="hq-goal-num">
             <b className="mono">{signed}</b>
-            <span className="soft">/ {WEEKLY_GOAL} signed</span>
+            <span className="soft">/ {goal} signed</span>
           </div>
           <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
           <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
-            {signed >= WEEKLY_GOAL
+            {signed >= goal
               ? "Goal hit — anything more is gravy. 🎉"
-              : `${WEEKLY_GOAL - signed} to go · ${daysLeftInWeek()} day${daysLeftInWeek() === 1 ? "" : "s"} left this week (Mon–Sun)`}
+              : `${goal - signed} to go · ${daysLeftInWeek()} day${daysLeftInWeek() === 1 ? "" : "s"} left this week (Mon–Sun)${scope === "all" ? ` · ${GOAL_PER_PERSON} per person` : ""}`}
           </p>
         </div>
 
