@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchAllCreators } from "@/lib/notion";
-import { currentUser } from "@/lib/auth";
+import { currentUser, TEAM } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,16 +39,28 @@ export async function POST() {
     const tomorrow = iso(new Date(Date.now() + 86400000));
     const wkStart = mondayOf();
 
-    const line = (label, status) =>
-      `${label}: ${countStage(all, status, today, tomorrow)} (${countStage(all, status, wkStart, tomorrow)} this week)`;
+    const line = (rows, label, status) =>
+      `${label}: ${countStage(rows, status, today, tomorrow)} (${countStage(rows, status, wkStart, tomorrow)} this week)`;
+
+    // Per-member one-liners under the team totals — zeros stay visible,
+    // that's the accountability part.
+    const memberLine = (m) => {
+      const rows = all.filter((c) => (c.owner || "lucas") === m);
+      const pair = (status) => `${countStage(rows, status, today, tomorrow)} (${countStage(rows, status, wkStart, tomorrow)} wk)`;
+      const name = m[0].toUpperCase() + m.slice(1);
+      return `${name} — Contacted: ${pair("Contacted")} · Responses: ${pair("Replied")} · Interviews: ${pair("Interview")} · Onboarded: ${pair("Signed")}`;
+    };
 
     const text = [
       "Daily Hiring Update:",
       "",
-      line("Creators Contacted", "Contacted"),
-      line("Responses Received", "Replied"),
-      line("Interviews Scheduled", "Interview"),
-      line("Onboarded", "Signed"),
+      line(all, "Creators Contacted", "Contacted"),
+      line(all, "Responses Received", "Replied"),
+      line(all, "Interviews Scheduled", "Interview"),
+      line(all, "Onboarded", "Signed"),
+      "",
+      "By team member:",
+      ...TEAM.map(memberLine),
     ].join("\n");
 
     const res = await fetch(webhook, {
