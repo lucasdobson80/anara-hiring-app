@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 // Weekly command centre: the 10-signings-a-week goal front and centre,
 // this week's funnel, the all-time pipeline shape, and (in All-team
 // scope) who's doing what. Weekly numbers come from Stage Log stamps,
@@ -22,6 +24,22 @@ const ALL_TIME_STAGES = ["New", "Approved", "Contacted", "Replied", "Interview",
 const daysLeftInWeek = () => 7 - ((new Date().getDay() + 6) % 7); // Mon=7 … Sun=1
 
 export default function HqTab({ counts, weekly, scope, team, user }) {
+  // End-of-day Slack post — always team-wide numbers, whoever clicks
+  const [slackSending, setSlackSending] = useState(false);
+  const [slackSent, setSlackSent] = useState(null);
+  const [slackErr, setSlackErr] = useState(null);
+  const sendDaily = async () => {
+    setSlackSending(true); setSlackErr(null); setSlackSent(null);
+    try {
+      const res = await fetch("/api/slack/daily", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      setSlackSent(data);
+    } catch (e) {
+      setSlackErr(e.message);
+    } finally { setSlackSending(false); }
+  };
+
   const tw = weekly?.thisWeek || {};
   const signed = tw.signed || 0;
   const goal = scope === "all" ? (team?.length || 1) * GOAL_PER_PERSON : GOAL_PER_PERSON;
@@ -77,6 +95,24 @@ export default function HqTab({ counts, weekly, scope, team, user }) {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="card hq-panel">
+          <div className="eyebrow">DAILY SLACK UPDATE</div>
+          <p className="soft" style={{ fontSize: 13, margin: "10px 0 0", lineHeight: 1.55 }}>
+            Posts today&apos;s team-wide numbers (contacted, responses, interviews, onboarded — with
+            week-to-date) to <b>#ext-ugc-hiring-team</b>. Anyone on the team can send it at end of day.
+          </p>
+          <button className="primary" style={{ marginTop: 12 }} onClick={sendDaily} disabled={slackSending}>
+            {slackSending ? "Sending…" : "Send today's update to Slack"}
+          </button>
+          {slackSent && (
+            <div style={{ marginTop: 10 }}>
+              <div className="run-summary ok" style={{ fontSize: 13 }}>✓ Posted to Slack</div>
+              <pre className="slack-preview">{slackSent.text}</pre>
+            </div>
+          )}
+          {slackErr && <div className="banner bad" style={{ marginTop: 10, borderRadius: 10 }}>{slackErr}</div>}
         </div>
 
         {scope === "all" && weekly?.perOwner && (
