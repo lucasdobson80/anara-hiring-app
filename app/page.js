@@ -546,7 +546,7 @@ export default function AnaraCastingDesk() {
                         return (
                           <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
                             <span className="rname">{c.name || c.handle}</span>
-                            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <span className="roster-tags">
                               {prog && <span className={"sign-badge" + (prog.done === prog.total ? " full" : "")}>{prog.done === prog.total ? "✓ set up" : `${prog.done}/${prog.total}`}</span>}
                               <span className="badge">{stageLabel(stageOf(c))}</span>
                             </span>

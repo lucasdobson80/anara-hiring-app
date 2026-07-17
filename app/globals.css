@@ -305,6 +305,10 @@ h1 { align-self: center; }
 .stale-toggle { display: block; width: 100%; text-align: left; background: none; border: 1px dashed #272D3A; color: #98A0B3; border-radius: 9px; padding: 9px 12px; margin: 4px 0 6px; font-family: 'Spline Sans Mono', monospace; font-size: 12px; cursor: pointer; }
 .stale-toggle:hover { border-color: #3a4256; color: #EFEDE6; }
 
+/* Roster row: let the name truncate so the badges never overflow the row */
+.rname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roster-tags { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+
 .sign-badge { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .04em; color: #98A0B3; border: 1px solid #272D3A; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .sign-badge.full { color: #3ECF8E; border-color: rgba(62,207,142,.5); }
 
