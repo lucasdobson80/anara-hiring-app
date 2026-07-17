@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, renderDm, DEFAULT_MESSAGES, igWelcome, mailtoLink,
-  INTERVIEW_INTRO, INTERVIEW_CLOSE, CONTRACT_STEPS, IG_SETUP,
+  firstNameOf, renderDm, DEFAULT_MESSAGES, mailtoLink, stageLabel,
+  INTERVIEW_INTRO, INTERVIEW_CLOSE,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
@@ -361,9 +361,9 @@ export default function AnaraCastingDesk() {
       <div className="frame">
         <aside className="rail">
           <div className="eyebrow">FUNNEL</div>
-          {displayCounts.map(({ stage, n }) => (
+          {displayCounts.filter(({ stage }) => stage !== "Approved" && stage !== "Rejected").map(({ stage, n }) => (
             <div key={stage} className={"stage-row" + (stage === "New" ? " hot" : "")}>
-              <span>{stage}</span><b>{n}</b>
+              <span>{stageLabel(stage)}</span><b>{n}</b>
             </div>
           ))}
           <p className="hint">A approve · R reject · U undo. Decisions queue locally; Save pushes them all to Notion in one go.</p>
@@ -527,7 +527,7 @@ export default function AnaraCastingDesk() {
                   />
                   {["All", ...ONBOARD_STAGES].map((s) => (
                     <button key={s} className={"chip" + (onboardStage === s ? " on" : "")} onClick={() => setOnboardStage(s)}>
-                      {s}
+                      {stageLabel(s)}
                     </button>
                   ))}
                 </div>
@@ -547,8 +547,8 @@ export default function AnaraCastingDesk() {
                           <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
                             <span className="rname">{c.name || c.handle}</span>
                             <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                              {prog && <span className={"sign-badge" + (prog.done === prog.total ? " full" : "")}>{prog.done === prog.total ? "✓ onboarded" : `${prog.done}/${prog.total}`}</span>}
-                              <span className="badge">{stageOf(c)}</span>
+                              {prog && <span className={"sign-badge" + (prog.done === prog.total ? " full" : "")}>{prog.done === prog.total ? "✓ set up" : `${prog.done}/${prog.total}`}</span>}
+                              <span className="badge">{stageLabel(stageOf(c))}</span>
                             </span>
                           </button>
                         );
@@ -579,7 +579,7 @@ export default function AnaraCastingDesk() {
                       }
                       return (
                         <div key={stage}>
-                          <div className="roster-head"><span>{stage.toUpperCase()}</span><span>{members.length}</span></div>
+                          <div className="roster-head"><span>{stageLabel(stage).toUpperCase()}</span><span>{members.length}</span></div>
                           {members.map(rowOf)}
                         </div>
                       );
@@ -620,13 +620,16 @@ export default function AnaraCastingDesk() {
                             <>
                               <div className="stepper">
                                 {ONBOARD_STAGES.map((s) => (
-                                  <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{s}</button>
+                                  <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{stageLabel(s)}</button>
                                 ))}
                               </div>
                               <StagePack
                                 stage={stage} first={first} email={c.email}
                                 copy={copy} copiedKey={copiedKey} dmFor={dmFor}
                                 welcomeText={welcomeFor(first)}
+                                welcomeMsg={renderDm(messages["Welcome message"], first)}
+                                contractLink={messages["Contract template link"]}
+                                trialLink={messages["Trial videos link"]}
                                 signState={readSign(c.id)}
                                 onSign={(next) => { writeSign(c.id, next); bumpSign(); }}
                                 onOnboarded={() => appendOnboardNote(c.id)}
@@ -659,7 +662,7 @@ export default function AnaraCastingDesk() {
   );
 }
 
-function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, signState, onSign, onOnboarded }) {
+function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -699,7 +702,7 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, s
       <C k="p-intro" text={INTERVIEW_INTRO}>Copy intro script + non-compete check</C>
       <C k="p-close" text={INTERVIEW_CLOSE}>Copy closing script</C>
       <L href={LINKS.interviewSlides}>Interview slides</L>
-      <p className="soft">Get their full name in the chat before the call ends — you need it for the contract. Then move them to Signed and run onboarding immediately.</p>
+      <p className="soft">Get their full name in the chat before the call ends — you need it for the contract. Then move them to Onboarded and run setup immediately.</p>
     </div>
   );
   // Signed: the onboarding wizard — tick each step as you go; state persists
@@ -707,16 +710,17 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, s
   const s = signState || {};
   const steps = [
     { key: "contract", label: "Contract", body: (<>
-      <C k="p-contract" text={CONTRACT_STEPS}>Copy contract steps</C>
-      <L href={LINKS.contractTemplate}>Contract template</L>
+      <L href={contractLink || LINKS.contractTemplate}>Contract template</L>
     </>) },
     { key: "tracker", label: "Add tracker row", body: (<>
       <L href={LINKS.tracker}>Open Creator Tracker</L>
       <p className="soft" style={{ margin: "4px 0 0", fontSize: 12.5 }}>Full name + all fields; leave the tax column to Alba.</p>
     </>) },
     { key: "groupchats", label: "Group chats", body: (<>
-      <C k="p-igsetup" text={IG_SETUP}>Copy chat setup steps</C>
-      <C k="p-igmsg" text={igWelcome(first)}>Copy welcome message</C>
+      <C k="p-igmsg" text={welcomeMsg}>Copy welcome message</C>
+      {trialLink
+        ? <C k="p-trial" text={trialLink}>Copy Trial videos link</C>
+        : <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Set the Trial videos link in Messages</p>}
       <L href={LINKS.celebrationsChat}>Celebrations chat</L>
       <L href={LINKS.announcementsChat}>Announcements chat</L>
     </>) },
@@ -734,7 +738,7 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, s
   const toggle = (key) => onSign({ ...s, [key]: !s[key] });
   return (
     <div className="pack">
-      <div className="eyebrow">SIGNED — ONBOARD NOW ({done}/{steps.length})</div>
+      <div className="eyebrow">ONBOARDED — FINISH SETUP ({done}/{steps.length})</div>
       {steps.map((st, i) => (
         <div key={st.key} className={"sign-step" + (s[st.key] ? " done" : "")}>
           <button className="sign-check" onClick={() => toggle(st.key)} aria-label={s[st.key] ? "Mark incomplete" : "Mark done"}>

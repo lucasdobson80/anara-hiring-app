@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { stageLabel } from "@/lib/templates";
 
 // The tracking hub — the only team-wide surface. Day / Week / Month pages
 // (step back through history with the arrows), each showing the goal, the
@@ -8,7 +9,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // My stats vs Team stats is the only place that toggle lives now.
 
 const FUNNEL = [
-  ["approved", "Approved"],
   ["contacted", "Contacted"],
   ["replied", "Replied"],
   ["interview", "Interview"],
@@ -94,7 +94,7 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
             <div className="eyebrow">{scope === "all" ? "TEAM GOAL" : "MY GOAL"} · {(rel || data?.label || "").toUpperCase()}</div>
             <div className="hq-goal-num">
               <b className="mono">{signed}</b>
-              <span className="soft">/ {goal} signed</span>
+              <span className="soft">/ {goal} onboarded</span>
             </div>
             <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
             <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
@@ -109,7 +109,7 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
             <div className="hq-funnel">
               {FUNNEL.map(([k, label]) => (
                 <div key={k} className="hq-frow">
-                  <span className="hq-flabel">{label}</span>
+                  <span className="hq-flabel">{stageLabel(label)}</span>
                   <div className="hq-fbars"><div className="hq-fbar now" style={{ width: `${((f[k] || 0) / maxBar) * 100}%` }} /></div>
                   <span className="mono hq-fnums"><b>{f[k] || 0}</b></span>
                 </div>
@@ -124,7 +124,7 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
               <div className="hq-acct-scroll">
                 <div className="hq-acct hq-acct-head">
                   <span></span>
-                  {FUNNEL.map(([k, label]) => <span key={k} className="mono">{label.toLowerCase()}</span>)}
+                  {FUNNEL.map(([k, label]) => <span key={k} className="mono">{stageLabel(label).toLowerCase()}</span>)}
                 </div>
                 {team.map((m) => (
                   <div key={m} className={"hq-acct" + (m === me ? " me" : "")}>

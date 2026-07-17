@@ -4,7 +4,7 @@ import { currentUser, TEAM } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const FUNNEL = ["Approved", "Contacted", "Replied", "Interview", "Signed"];
+const FUNNEL = ["Contacted", "Replied", "Interview", "Signed"];
 
 // Per-person signing goal by period (Day 2, Week 10, Month 40); the team
 // goal is this × headcount, so it scales as accounts are added.
