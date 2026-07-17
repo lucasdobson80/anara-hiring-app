@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-// Weekly command centre: the 10-signings-a-week goal front and centre,
-// this week's funnel, the all-time pipeline shape, and (in All-team
-// scope) who's doing what. Weekly numbers come from Stage Log stamps,
-// so they accrue from the day that shipped.
+// The tracking hub — the only team-wide surface. Day / Week / Month pages
+// (step back through history with the arrows), each showing the goal, the
+// Approved→Signed funnel, a per-account table, and the all-time pipeline.
+// My stats vs Team stats is the only place that toggle lives now.
 
-// Per-person weekly signing goal; the All-team goal scales with headcount
-// (accounts × 10), so it adjusts itself when the team grows.
-const GOAL_PER_PERSON = 10;
-// Sourced is deliberately absent — it's 10-20x the other stages and lives
-// in Source; the funnel tracks the human pipeline from Approved onward.
 const FUNNEL = [
   ["approved", "Approved"],
   ["contacted", "Contacted"],
@@ -20,124 +15,144 @@ const FUNNEL = [
   ["signed", "Signed"],
 ];
 const ALL_TIME_STAGES = ["New", "Approved", "Contacted", "Replied", "Interview", "Signed", "Rejected"];
+const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"]];
 
-const daysLeftInWeek = () => 7 - ((new Date().getDay() + 6) % 7); // Mon=7 … Sun=1
+// "Today" / "This week" etc. when current, "Yesterday" / "Last week" at -1
+const REL = {
+  day: { 0: "Today", "-1": "Yesterday" },
+  week: { 0: "This week", "-1": "Last week" },
+  month: { 0: "This month", "-1": "Last month" },
+};
 
-export default function HqTab({ counts, weekly, scope, team, user }) {
-  // End-of-day Slack post — always team-wide numbers, whoever clicks
-  const [slackSending, setSlackSending] = useState(false);
-  const [slackSent, setSlackSent] = useState(null);
-  const [slackErr, setSlackErr] = useState(null);
-  const sendDaily = async () => {
-    setSlackSending(true); setSlackErr(null); setSlackSent(null);
+export default function HqTab({ user: initialUser, team: initialTeam }) {
+  const [period, setPeriod] = useState("week");
+  const [offset, setOffset] = useState(0);
+  const [scope, setScope] = useState("mine");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/slack/daily", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      setSlackSent(data);
+      const res = await fetch(`/api/hq?period=${period}&offset=${offset}&scope=${scope}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.message || `Request failed (${res.status})`);
+      setData(d);
     } catch (e) {
-      setSlackErr(e.message);
-    } finally { setSlackSending(false); }
-  };
+      setError(e.message);
+    } finally { setLoading(false); }
+  }, [period, offset, scope]);
 
-  const tw = weekly?.thisWeek || {};
-  const signed = tw.signed || 0;
-  const goal = scope === "all" ? (team?.length || 1) * GOAL_PER_PERSON : GOAL_PER_PERSON;
+  useEffect(() => { load(); }, [load]);
+
+  // Switching period resets to the current window (offsets don't map across day/week/month)
+  const pickPeriod = (p) => { setPeriod(p); setOffset(0); };
+
+  const team = data?.team || initialTeam || [];
+  const me = data?.user || initialUser;
+  const f = data?.funnel || {};
+  const goal = data?.goal || 1;
+  const signed = data?.signed || 0;
   const pct = Math.min(100, Math.round((signed / goal) * 100));
-  const maxBar = Math.max(1, ...FUNNEL.map(([k]) => tw[k] || 0));
-  const allTimeMax = Math.max(1, ...ALL_TIME_STAGES.map((s) => counts?.[s] || 0));
+  const maxBar = Math.max(1, ...FUNNEL.map(([k]) => f[k] || 0));
+  const allTime = data?.allTime || {};
+  const allTimeMax = Math.max(1, ...ALL_TIME_STAGES.map((s) => allTime[s] || 0));
+  const rel = REL[period]?.[String(offset)];
 
   return (
     <div>
-      <div className="hq-grid">
-        <div className="card hq-goal">
-          <div className="eyebrow">THIS WEEK&apos;S GOAL{scope === "all" ? " · ALL TEAM" : ""}</div>
-          <div className="hq-goal-num">
-            <b className="mono">{signed}</b>
-            <span className="soft">/ {goal} signed</span>
-          </div>
-          <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
-          <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
-            {signed >= goal
-              ? "Goal hit — anything more is gravy. 🎉"
-              : `${goal - signed} to go · ${daysLeftInWeek()} day${daysLeftInWeek() === 1 ? "" : "s"} left this week (Mon–Sun)${scope === "all" ? ` · ${GOAL_PER_PERSON} per person` : ""}`}
-          </p>
+      <div className="hq-controls">
+        <div className="viewtoggle" style={{ margin: 0 }}>
+          {PERIODS.map(([p, label]) => (
+            <button key={p} className={period === p ? "chip on" : "chip"} onClick={() => pickPeriod(p)}>{label}</button>
+          ))}
         </div>
-
-        <div className="card hq-panel">
-          <div className="eyebrow">THIS WEEK&apos;S FUNNEL</div>
-          <div className="hq-funnel">
-            {FUNNEL.map(([k, label]) => (
-              <div key={k} className="hq-frow">
-                <span className="hq-flabel">{label}</span>
-                <div className="hq-fbars">
-                  <div className="hq-fbar now" style={{ width: `${((tw[k] || 0) / maxBar) * 100}%` }} />
-                </div>
-                <span className="mono hq-fnums"><b>{tw[k] || 0}</b></span>
-              </div>
-            ))}
-          </div>
-          <p className="soft" style={{ fontSize: 11.5, margin: "10px 0 0" }}>
-            counted from status changes saved in the app
-          </p>
+        <div className="hq-period-nav">
+          <button className="ghost tiny" aria-label="Previous" onClick={() => setOffset((o) => o - 1)}>‹</button>
+          <span className="hq-period-label mono">{data?.label || "…"}{rel ? <span className="soft"> · {rel}</span> : null}</span>
+          <button className="ghost tiny" aria-label="Next" disabled={offset >= 0} onClick={() => setOffset((o) => Math.min(0, o + 1))}>›</button>
         </div>
-
-        <div className="card hq-panel">
-          <div className="eyebrow">ALL-TIME PIPELINE</div>
-          <div className="hq-funnel">
-            {ALL_TIME_STAGES.map((s) => (
-              <div key={s} className="hq-frow">
-                <span className="hq-flabel">{s}</span>
-                <div className="hq-fbars">
-                  <div className="hq-fbar all" style={{ width: `${((counts?.[s] || 0) / allTimeMax) * 100}%` }} />
-                </div>
-                <span className="mono hq-fnums"><b>{counts?.[s] || 0}</b></span>
-              </div>
-            ))}
-          </div>
+        <div className="scope-toggle" style={{ marginLeft: "auto" }}>
+          <button className={scope === "mine" ? "on" : ""} onClick={() => setScope("mine")}>My stats</button>
+          <button className={scope === "all" ? "on" : ""} onClick={() => setScope("all")}>Team stats</button>
         </div>
+      </div>
 
-        <div className="card hq-panel">
-          <div className="eyebrow">DAILY SLACK UPDATE</div>
-          <p className="soft" style={{ fontSize: 13, margin: "10px 0 0", lineHeight: 1.55 }}>
-            Posts today&apos;s team-wide numbers (contacted, responses, interviews, onboarded — with
-            week-to-date) to <b>#ext-ugc-hiring-team</b>. Anyone on the team can send it at end of day.
-          </p>
-          <button className="primary" style={{ marginTop: 12 }} onClick={sendDaily} disabled={slackSending}>
-            {slackSending ? "Sending…" : "Send today's update to Slack"}
-          </button>
-          {slackSent && (
-            <div style={{ marginTop: 10 }}>
-              <div className="run-summary ok" style={{ fontSize: 13 }}>✓ Posted to Slack</div>
-              <pre className="slack-preview">{slackSent.text}</pre>
+      {error && <div className="banner bad" style={{ borderRadius: 10, marginBottom: 14 }}>{error}</div>}
+
+      {loading && !data ? (
+        <div className="hq-grid">
+          <div className="sk sk-panel" /><div className="sk sk-panel" />
+          <div className="sk sk-panel" /><div className="sk sk-panel" />
+        </div>
+      ) : (
+        <div className="hq-grid" style={loading ? { opacity: 0.55 } : undefined}>
+          <div className="card hq-goal">
+            <div className="eyebrow">{scope === "all" ? "TEAM GOAL" : "MY GOAL"} · {(rel || data?.label || "").toUpperCase()}</div>
+            <div className="hq-goal-num">
+              <b className="mono">{signed}</b>
+              <span className="soft">/ {goal} signed</span>
             </div>
-          )}
-          {slackErr && <div className="banner bad" style={{ marginTop: 10, borderRadius: 10 }}>{slackErr}</div>}
-        </div>
+            <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
+            <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
+              {signed >= goal
+                ? "Goal hit — anything more is gravy. 🎉"
+                : `${goal - signed} to go${scope === "all" ? ` · ${data?.goalPerPerson} per person` : ""}`}
+            </p>
+          </div>
 
-        {scope === "all" && weekly?.perOwner && (
           <div className="card hq-panel">
-            <div className="eyebrow">TEAM THIS WEEK</div>
-            <div className="hq-team">
-              <div className="hq-trow hq-thead">
-                <span></span><span className="mono">contacted</span><span className="mono">interview</span><span className="mono">signed</span>
+            <div className="eyebrow">FUNNEL · {(rel || data?.label || "").toUpperCase()}</div>
+            <div className="hq-funnel">
+              {FUNNEL.map(([k, label]) => (
+                <div key={k} className="hq-frow">
+                  <span className="hq-flabel">{label}</span>
+                  <div className="hq-fbars"><div className="hq-fbar now" style={{ width: `${((f[k] || 0) / maxBar) * 100}%` }} /></div>
+                  <span className="mono hq-fnums"><b>{f[k] || 0}</b></span>
+                </div>
+              ))}
+            </div>
+            <p className="soft" style={{ fontSize: 11.5, margin: "10px 0 0" }}>counted from status changes saved in the app</p>
+          </div>
+
+          <div className="card hq-panel" style={{ gridColumn: "1 / -1" }}>
+            <div className="eyebrow">BY TEAM MEMBER · {(rel || data?.label || "").toUpperCase()}</div>
+            <div className="hq-acct-scroll">
+              <div className="hq-acct hq-acct-head">
+                <span></span>
+                {FUNNEL.map(([k, label]) => <span key={k} className="mono">{label.toLowerCase()}</span>)}
               </div>
               {team.map((m) => (
-                <div key={m} className={"hq-trow" + (m === user ? " me" : "")}>
+                <div key={m} className={"hq-acct" + (m === me ? " me" : "")}>
                   <span style={{ textTransform: "capitalize" }}>{m}</span>
-                  <span className="mono">{weekly.perOwner[m]?.contacted ?? 0}</span>
-                  <span className="mono">{weekly.perOwner[m]?.interview ?? 0}</span>
-                  <span className="mono"><b>{weekly.perOwner[m]?.signed ?? 0}</b></span>
+                  {FUNNEL.map(([k]) => (
+                    <span key={k} className={"mono" + (k === "signed" ? " strong" : "")}>{data?.perOwner?.[m]?.[k] ?? 0}</span>
+                  ))}
                 </div>
               ))}
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="card hq-panel" style={{ gridColumn: "1 / -1" }}>
+            <div className="eyebrow">ALL-TIME PIPELINE{scope === "all" ? " · WHOLE TEAM" : " · MINE"}</div>
+            <div className="hq-funnel">
+              {ALL_TIME_STAGES.map((s) => (
+                <div key={s} className="hq-frow">
+                  <span className="hq-flabel">{s}</span>
+                  <div className="hq-fbars"><div className="hq-fbar all" style={{ width: `${((allTime[s] || 0) / allTimeMax) * 100}%` }} /></div>
+                  <span className="mono hq-fnums"><b>{allTime[s] || 0}</b></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="hint">
-        Weekly numbers count each creator once per stage, stamped when you press Save — history before
-        {" "}{weekly?.weekStart ? "the tracker shipped" : "now"} isn&apos;t dated, so counts build from here.
-        Switch My pipeline / All team (top right) to change whose week you&apos;re looking at.
+        Numbers count each creator once per stage, stamped when a status is saved — history before the tracker
+        shipped (11 Jul) isn&apos;t dated, so counts build from there. Use the arrows to step back through past{" "}
+        {period === "day" ? "days" : period === "month" ? "months" : "weeks"}.
       </p>
     </div>
   );

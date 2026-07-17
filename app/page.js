@@ -44,15 +44,12 @@ export default function AnaraCastingDesk() {
   const [queue, setQueue] = useState([]);
   const [roster, setRoster] = useState([]);
   const [counts, setCounts] = useState({});
-  const [weekly, setWeekly] = useState(null);
   const [view, setView] = useState("one"); // "one" | "browse"
   const [selected, setSelected] = useState(null);
   const [onboardSearch, setOnboardSearch] = useState("");
   const [onboardStage, setOnboardStage] = useState("All");
-  const [onboardOwner, setOnboardOwner] = useState("All");
   const [user, setUser] = useState(null);
   const [team, setTeam] = useState(["lucas", "laia", "alba"]);
-  const [scope, setScope] = useState("mine"); // "mine" | "all"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -88,14 +85,13 @@ export default function AnaraCastingDesk() {
     } finally { setDmSaving(false); }
   };
 
-  // Guards against a slow older fetch overwriting a newer one (e.g. after a
-  // quick scope toggle) — only the latest request may apply its response.
+  // Review + Onboard always show your OWN pipeline (team view lives in HQ).
   const loadSeq = useRef(0);
-  const load = useCallback(async ({ keepPending = false, scope: sc } = {}) => {
+  const load = useCallback(async ({ keepPending = false } = {}) => {
     const seq = ++loadSeq.current;
     setLoading(true); setError(null); setNeedsSetup(false);
     try {
-      const res = await fetch(`/api/pipeline?scope=${sc || scope}`);
+      const res = await fetch("/api/pipeline");
       const data = await res.json();
       if (seq !== loadSeq.current) return;
       if (!res.ok) {
@@ -105,7 +101,6 @@ export default function AnaraCastingDesk() {
       setQueue(data.queue);
       setRoster(data.roster);
       setCounts(data.counts);
-      setWeekly(data.weekly || null);
       if (data.user) setUser(data.user);
       if (data.team) setTeam(data.team);
       if (!keepPending) setPending({});
@@ -114,23 +109,9 @@ export default function AnaraCastingDesk() {
       if (seq !== loadSeq.current) return;
       setError("Couldn't load the pipeline from Notion. " + e.message + " — press Reload to retry.");
     } finally { if (seq === loadSeq.current) setLoading(false); }
-  }, [scope]);
-
-  // One fetch on mount, with the remembered scope — setting state first and
-  // letting a scope-dependent effect refetch would race two requests.
-  useEffect(() => {
-    let s = "mine";
-    try { const v = localStorage.getItem("cd_scope"); if (v === "all" || v === "mine") s = v; } catch {}
-    setScope(s);
-    load({ scope: s });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const switchScope = (s) => {
-    setScope(s);
-    try { localStorage.setItem("cd_scope", s); } catch {}
-    load({ keepPending: pendingCount > 0, scope: s });
-  };
+  useEffect(() => { load(); }, [load]);
 
   // ── Background run watcher ─────────────────────────────────────────
   // Sourcing runs launched from the Source tab are imported HERE, at the
@@ -333,18 +314,20 @@ export default function AnaraCastingDesk() {
             {user && <span className="signed-in mono" title="Signed in">{user}</span>}
             <nav className="tabs" aria-label="Sections">
               <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>HQ</button>
-              <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
-              <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
-              <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
-              <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
+              <span className="tab-group">
+                <span className="tab-group-label">FIND</span>
+                <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
+                <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
+              </span>
+              <span className="tab-group">
+                <span className="tab-group-label">PIPELINE</span>
+                <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
+                <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
+              </span>
             </nav>
           </div>
         </div>
         <div className="top-actions">
-          <div className="scope-toggle">
-            <button className={scope === "mine" ? "on" : ""} onClick={() => switchScope("mine")}>My pipeline</button>
-            <button className={scope === "all" ? "on" : ""} onClick={() => switchScope("all")}>All team</button>
-          </div>
           <button className="ghost" onClick={() => load({ keepPending: pendingCount > 0 })} disabled={loading || syncing}>Reload</button>
           <button className="primary" onClick={sync} disabled={!pendingCount || syncing}>
             {syncing ? "Saving…" : pendingCount ? `Save ${pendingCount} to Notion` : "Nothing to save"}
@@ -408,7 +391,7 @@ export default function AnaraCastingDesk() {
                           <div key={c.id} className={"browse-row" + (verdict === "Approved" ? " ok" : verdict === "Rejected" ? " no" : "")}>
                             <div className="browse-main">
                               <a href={c.link || "#"} target="_blank" rel="noreferrer" className="browse-name">{c.name || c.handle} <IconExt width={12} height={12} /></a>
-                              <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views{scope === "all" && c.owner ? ` · ${c.owner}` : ""}</span>
+                              <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views</span>
                             </div>
                             {c.niche?.includes("ugc") && <span className="ugc-chip">🎯</span>}
                             <span className="mini-stamp mono">{c.score ?? "–"}</span>
@@ -446,7 +429,7 @@ export default function AnaraCastingDesk() {
                     <div className="card-head">
                       <div>
                         <div className="name">{current.name || current.handle}</div>
-                        <div className="mono soft">{current.handle} · {current.platform} · {remaining.length} left in queue{scope === "all" && current.owner ? ` · ${current.owner}` : ""}</div>
+                        <div className="mono soft">{current.handle} · {current.platform} · {remaining.length} left in queue</div>
                         {current.niche?.filter((n) => n !== "ugc").length > 0 && (
                           <div className="niche-row">
                             {current.niche.filter((n) => n !== "ugc").map((n) => (
@@ -501,17 +484,11 @@ export default function AnaraCastingDesk() {
             </>
           )}
 
-          {tab === "source" && <SourceTab scope={scope} refreshKey={importsVersion} onImported={() => load({ keepPending: pendingCount > 0 })} />}
+          {tab === "source" && <SourceTab refreshKey={importsVersion} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
-          {tab === "hq" && (loading ? (
-            <div className="hq-grid" aria-label="Loading">
-              <div className="sk sk-panel" />
-              <div className="sk sk-panel" />
-              <div className="sk sk-panel" />
-            </div>
-          ) : <HqTab counts={counts} weekly={weekly} scope={scope} team={team} user={user} />)}
+          {tab === "hq" && <HqTab team={team} user={user} />}
 
 
           {tab === "onboard" && (
@@ -548,16 +525,6 @@ export default function AnaraCastingDesk() {
                     </button>
                   ))}
                 </div>
-                {scope === "all" && (
-                  <div className="onboard-tools" style={{ marginTop: -6 }}>
-                    <span className="eyebrow" style={{ marginRight: 2 }}>OWNER</span>
-                    {["All", ...team].map((o) => (
-                      <button key={o} className={"chip" + (onboardOwner === o ? " on" : "")} onClick={() => setOnboardOwner(o)}>
-                        {o === "All" ? "All" : o[0].toUpperCase() + o.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 <div className="onboard-grid">
                   <div className="roster">
                     {ONBOARD_STAGES.filter((stage) => onboardStage === "All" || onboardStage === stage).map((stage) => {
@@ -565,7 +532,6 @@ export default function AnaraCastingDesk() {
                       const members = roster.filter(
                         (c) =>
                           stageOf(c) === stage &&
-                          (scope !== "all" || onboardOwner === "All" || (c.owner || "lucas") === onboardOwner) &&
                           (!q || (c.name || "").toLowerCase().includes(q) || (c.handle || "").toLowerCase().includes(q))
                       );
                       if (!members.length) return null;
@@ -576,7 +542,6 @@ export default function AnaraCastingDesk() {
                             <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
                               <span className="rname">{c.name || c.handle}</span>
                               <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                {scope === "all" && <span className="owner-tag">{(c.owner || "lucas")[0].toUpperCase()}</span>}
                                 <span className="badge">{stageOf(c)}</span>
                               </span>
                             </button>

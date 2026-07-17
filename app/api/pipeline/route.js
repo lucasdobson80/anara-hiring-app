@@ -4,33 +4,9 @@ import { currentUser, TEAM } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// Review + Onboard are always the current user's OWN pipeline now — the
+// team-wide view lives only in HQ (/api/hq). No scope param here.
 const ONBOARD_STAGES = ["Approved", "Contacted", "Replied", "Interview", "Signed"];
-const FUNNEL_STAGES = ["Approved", "Rejected", "Contacted", "Replied", "Interview", "Signed"];
-
-// Monday-start week bucket for a YYYY-MM-DD string
-function mondayOf(offsetWeeks = 0) {
-  const d = new Date();
-  const day = (d.getDay() + 6) % 7; // Mon=0
-  d.setDate(d.getDate() - day + offsetWeeks * 7);
-  return d.toISOString().slice(0, 10);
-}
-
-function weeklyFunnel(creators, fromISO, toISO) {
-  const inWeek = (iso) => iso && iso >= fromISO && iso < toISO;
-  const out = { sourced: 0 };
-  for (const s of FUNNEL_STAGES) out[s.toLowerCase()] = 0;
-  for (const c of creators) {
-    if (inWeek(c.dateSourced)) out.sourced += 1;
-    const seen = new Set();
-    for (const ev of c.stageEvents || []) {
-      if (inWeek(ev.date) && FUNNEL_STAGES.includes(ev.status) && !seen.has(ev.status)) {
-        out[ev.status.toLowerCase()] += 1;
-        seen.add(ev.status);
-      }
-    }
-  }
-  return out;
-}
 
 // Demo mode: `MOCK_PIPELINE=1 npm run dev` serves fake data for UI work
 // without touching Notion.
@@ -49,11 +25,10 @@ const MOCK = {
   ],
 };
 
-export async function GET(request) {
+export async function GET() {
   const user = await currentUser();
-  const scope = new URL(request.url).searchParams.get("scope") === "all" ? "all" : "mine";
   if (process.env.MOCK_PIPELINE === "1") {
-    return NextResponse.json({ ...MOCK, user, scope, team: TEAM });
+    return NextResponse.json({ ...MOCK, user, team: TEAM });
   }
   if (!process.env.NOTION_TOKEN) {
     return NextResponse.json(
@@ -64,10 +39,8 @@ export async function GET(request) {
   try {
     // "Screened" rows are the AI-rejection ledger — dedupe data, not pipeline data
     let all = (await fetchAllCreators()).filter((c) => c.status !== "Screened");
-    // Legacy rows with no owner belong to lucas
-    all = all.map((c) => ({ ...c, owner: c.owner || "lucas" }));
-    // "Mine" shows only your creators; "All team" shows everyone's
-    const scoped = scope === "all" ? all : all.filter((c) => c.owner === user);
+    // Legacy rows with no owner belong to lucas; you only ever see your own
+    const scoped = all.filter((c) => (c.owner || "lucas") === user);
 
     const counts = {};
     for (const c of scoped) {
@@ -81,26 +54,9 @@ export async function GET(request) {
       .filter((c) => ONBOARD_STAGES.includes(c.status))
       .sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
 
-    // Weekly funnel (Monday-start): transitions come from the Stage Log, so
-    // numbers accrue from the day stamping shipped — not retroactively.
-    const wkStart = mondayOf(0);
-    const nextWk = mondayOf(1);
-    const weekly = {
-      weekStart: wkStart,
-      thisWeek: weeklyFunnel(scoped, wkStart, nextWk),
-    };
-    if (scope === "all") {
-      weekly.perOwner = {};
-      for (const member of TEAM) {
-        const own = scoped.filter((c) => c.owner === member);
-        const wk = weeklyFunnel(own, wkStart, nextWk);
-        weekly.perOwner[member] = { contacted: wk.contacted, interview: wk.interview, signed: wk.signed };
-      }
-    }
-
     // stageEvents served their purpose — don't bloat the payload
     const strip = (c) => { const { stageEvents, ...rest } = c; return rest; };
-    return NextResponse.json({ counts, queue: queue.map(strip), roster: roster.map(strip), weekly, user, scope, team: TEAM });
+    return NextResponse.json({ counts, queue: queue.map(strip), roster: roster.map(strip), user, team: TEAM });
   } catch (e) {
     return NextResponse.json(
       { error: "notion", message: e.message || "Notion request failed" },

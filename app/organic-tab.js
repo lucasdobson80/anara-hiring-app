@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
-// Organic scouting: creators Lucas finds himself while scrolling. Everything
-// added here lands in Review with full stats — no score bar, a hand-pick
-// always gets through, and pasting someone previously screened/rejected
-// rescues them into the queue.
+// Organic scouting: creators you find yourself while scrolling. You've
+// already judged them by eye, so they skip Review and land straight in
+// Onboard as Approved (ready to DM) — TikTok/Instagram get scraped for
+// stats first; LinkedIn goes in as a tracked bookmark. Pasting someone
+// previously screened/rejected rescues them into Approved too.
 
 export default function OrganicTab({ onImported }) {
   const [text, setText] = useState("");
@@ -37,9 +38,9 @@ export default function OrganicTab({ onImported }) {
         <p className="soft" style={{ fontSize: 13.5, margin: "8px 0 0", lineHeight: 1.6 }}>
           Paste everything you found this session — <b>TikTok, Instagram, or LinkedIn</b> profile links,
           video/reel links, or @handles, any mix, separated by new lines, spaces, or commas (up to 30 per
-          batch). TikTok and Instagram get scraped for stats and scored for context; LinkedIn profiles go
-          straight in as tracked bookmarks (no stats — you already judged them by eye). Everything lands
-          in <b>Review</b>: no score bar here, and pasting someone the AI screened out rescues them.
+          batch). TikTok and Instagram get scraped for stats; LinkedIn profiles go in as tracked bookmarks
+          (no stats — you already judged them by eye). Everything lands straight in <b>Onboard as Approved</b>,
+          ready to DM — no Review step, and pasting someone previously rejected rescues them.
         </p>
         <textarea
           className="input note-area"
@@ -50,13 +51,12 @@ export default function OrganicTab({ onImported }) {
         />
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
           <button className="primary" onClick={add} disabled={busy || !text.trim()}>
-            {busy ? "Scraping & scoring… ~1 min" : "Add to Review"}
+            {busy ? "Scraping… ~1 min" : "Add to Onboard"}
           </button>
         </div>
         {result && !result.error && (
           <div className="banner" style={{ marginTop: 10, borderRadius: 10 }}>
-            {result.added} added · {result.rescued} rescued from screened/rejected · {result.alreadyKnown} already in the pipeline
-            {result.details?.filter((d) => d.alreadyKnown && d.owner && d.owner !== "lucas").map((d) => ` · @${d.handle} is in ${d.owner}'s pipeline`).join("")}
+            {result.added} added to Onboard · {result.rescued} rescued from screened/rejected · {result.alreadyKnown} already in the pipeline
             {result.notFound?.length > 0 && ` · not found: ${result.notFound.join(", ")}`}
           </div>
         )}

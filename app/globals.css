@@ -274,3 +274,27 @@ h1 { align-self: center; }
 .run-progress-fill { display: block; height: 100%; background: linear-gradient(90deg, #6E7BFF, #FFE566); border-radius: 999px; transition: width .6s var(--ease); }
 /* Slack daily-update preview */
 .slack-preview { font-family: 'Spline Sans Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.6; background: #0E1014; border: 1px solid #272D3A; border-radius: 10px; padding: 12px 14px; margin: 8px 0 0; white-space: pre-wrap; color: #98A0B3; }
+
+/* ============================================================
+   Nav grouping (Find / Pipeline) + rebuilt HQ hub
+   ============================================================ */
+.tab-group { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border: 1px solid #21262f; border-radius: 999px; position: relative; }
+.tab-group-label { font-family: 'Spline Sans Mono', monospace; font-size: 8.5px; letter-spacing: .16em; color: #5b6472; padding-right: 2px; }
+@media (max-width: 480px) {
+  .tabs { flex-wrap: wrap; gap: 8px; }
+  .tab-group { flex-wrap: wrap; }
+}
+
+/* HQ control bar: period switcher · history arrows · My/Team toggle */
+.hq-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.hq-period-nav { display: inline-flex; align-items: center; gap: 8px; }
+.hq-period-nav .tiny { min-width: 30px; text-align: center; font-size: 16px !important; line-height: 1; padding: 4px 8px !important; }
+.hq-period-label { font-size: 13px; min-width: 130px; }
+
+/* Per-account table (all members × 5 stages), scrolls on small screens */
+.hq-acct-scroll { overflow-x: auto; margin-top: 8px; }
+.hq-acct { display: grid; grid-template-columns: 1.2fr repeat(5, 1fr); gap: 8px; align-items: center; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; min-width: 460px; }
+.hq-acct.me { background: rgba(110,123,255,.09); }
+.hq-acct-head { font-family: 'Spline Sans Mono', monospace; font-size: 10px; letter-spacing: .08em; color: #98A0B3; }
+.hq-acct .mono { text-align: right; }
+.hq-acct .mono.strong { color: #FFE566; font-weight: 600; }

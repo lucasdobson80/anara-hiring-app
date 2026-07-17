@@ -109,7 +109,7 @@ export async function POST(request) {
       candidates.push(...ig);
     }
 
-    // LinkedIn: tracked bookmarks — no scrape, no score, straight to Review
+    // LinkedIn: tracked bookmarks — no scrape, no score, straight to Onboard
     for (const slug of liProfiles) {
       candidates.push({
         handle: slug,
@@ -137,8 +137,9 @@ export async function POST(request) {
       const known = byHandle.get(key(c.handle, plat));
       if (!known) { fresh.push(c); continue; }
       if (known.status === "Screened" || known.status === "Rejected") {
-        // Hand-picking overrides an earlier automated (or hasty) rejection
-        await updateStatus(known.id, "New");
+        // Hand-picking overrides an earlier automated (or hasty) rejection —
+        // straight into the pipeline as Approved, ready to DM
+        await updateStatus(known.id, "Approved");
         rescued += 1;
         addedList.push(c.handle);
         details.push({ handle: c.handle, platform: plat, score: known.score, followers: known.followers ?? c.followers, email: known.email || c.email || null, rescued: true, owner: known.owner || "lucas" });
@@ -149,9 +150,10 @@ export async function POST(request) {
     }
 
     if (fresh.length) {
-      // Score for the review card, but insert regardless of the bar —
-      // manual picks always reach human review. LinkedIn adds have no
-      // content stats to grade, so they skip scoring entirely.
+      // Score just for the card's context, then insert straight into the
+      // pipeline as Approved — you hand-picked them while scrolling, so
+      // they skip Review and land in Onboard ready to DM. LinkedIn adds
+      // have no content stats to grade, so they skip scoring entirely.
       const toScore = fresh.filter((c) => c.platform !== "LinkedIn");
       let results = new Map();
       try {
@@ -169,7 +171,7 @@ export async function POST(request) {
         const niche = [...new Set([...(s?.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
         await createCreator(
           { ...c, score: s?.score ?? null, rationale, niche },
-          "New",
+          "Approved",
           owner
         );
         added += 1;
