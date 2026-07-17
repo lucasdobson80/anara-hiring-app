@@ -1,13 +1,26 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { DEFAULT_MESSAGES, DEFAULT_MESSAGE_NAMES, MESSAGE_GROUPS, isLinkMessage, isRichMessage, htmlToText } from "@/lib/templates";
+import { DEFAULT_MESSAGES, DEFAULT_MESSAGE_NAMES, MESSAGE_GROUPS, isLinkMessage, isRichMessage, htmlToText, cleanEmailHtml } from "@/lib/templates";
 
-// Rich (HTML) editor — keeps pasted links + bullets. Uncontrolled: sets its
-// HTML once on mount, so remount (via key) is how the parent updates it.
+// Rich (HTML) editor — keeps pasted links + bullets but strips theme colours
+// so copies paste with the recipient's default styling (no dark backgrounds).
+// Uncontrolled: sets its HTML once on mount, remount (via key) updates it.
 function RichField({ html, onChange }) {
   const ref = useRef(null);
   useEffect(() => { if (ref.current) ref.current.innerHTML = html || ""; }, []);
+  const onPaste = (e) => {
+    e.preventDefault();
+    const src = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
+    document.execCommand("insertHTML", false, cleanEmailHtml(src));
+    onChange(ref.current.innerHTML);
+  };
+  const onCopy = (e) => {
+    e.preventDefault();
+    const clean = cleanEmailHtml(ref.current.innerHTML);
+    e.clipboardData.setData("text/html", clean);
+    e.clipboardData.setData("text/plain", htmlToText(clean));
+  };
   return (
     <div
       ref={ref}
@@ -15,6 +28,8 @@ function RichField({ html, onChange }) {
       contentEditable
       suppressContentEditableWarning
       onInput={() => onChange(ref.current.innerHTML)}
+      onPaste={onPaste}
+      onCopy={onCopy}
     />
   );
 }
@@ -37,9 +52,12 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
   const save = async (justSaved) => {
     setSaving(true); setErr(null);
     try {
-      // Only persist the fixed set — drop any stray legacy custom keys
+      // Only persist the fixed set — drop stray legacy keys, clean rich HTML
       const payload = {};
-      for (const name of DEFAULT_MESSAGE_NAMES) payload[name] = drafts[name] ?? DEFAULT_MESSAGES[name];
+      for (const name of DEFAULT_MESSAGE_NAMES) {
+        const v = drafts[name] ?? DEFAULT_MESSAGES[name];
+        payload[name] = isRichMessage(name) ? cleanEmailHtml(v) : v;
+      }
       const res = await fetch("/api/settings/messages", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: payload }),
@@ -73,7 +91,7 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
             )}
             <button
               className="ghost small"
-              onClick={() => (rich ? copyRich("msg-" + name, val, htmlToText(val)) : copy("msg-" + name, val))}
+              onClick={() => (rich ? copyRich("msg-" + name, cleanEmailHtml(val), htmlToText(cleanEmailHtml(val))) : copy("msg-" + name, val))}
             >
               {copiedKey === "msg-" + name ? "Copied ✓" : "Copy"}
             </button>

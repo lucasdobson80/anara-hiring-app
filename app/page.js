@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, renderDm, DEFAULT_MESSAGES, mailtoLink, stageLabel, htmlToText,
+  firstNameOf, renderDm, DEFAULT_MESSAGES, mailtoLink, stageLabel, htmlToText, cleanEmailHtml,
   INTERVIEW_INTRO, INTERVIEW_CLOSE,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
@@ -740,7 +740,7 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
       <C k="p-announce" text={LINKS.announcementsChat}>Copy Announcements chat link</C>
     </>) },
     { key: "email", label: "Welcome email", body: (<>
-      <button className="res copybtn" onClick={() => copyRich("p-email", welcomeHtml, htmlToText(welcomeHtml))}>
+      <button className="res copybtn" onClick={() => copyRich("p-email", cleanEmailHtml(welcomeHtml), htmlToText(welcomeHtml))}>
         {copiedKey === "p-email" ? "Copied ✓ — paste into Gmail" : "Copy welcome email"}
       </button>
       {email && <L href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`}>Open Gmail to {email}</L>}
