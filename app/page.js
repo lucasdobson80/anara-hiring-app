@@ -315,14 +315,14 @@ export default function AnaraCastingDesk() {
             <nav className="tabs" aria-label="Sections">
               <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>HQ</button>
               <span className="tab-group">
+                <span className="tab-group-label">PIPELINE</span>
+                <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
+                <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
+              </span>
+              <span className="tab-group">
                 <span className="tab-group-label">FIND</span>
                 <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
                 <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
-              </span>
-              <span className="tab-group">
-                <span className="tab-group-label">PIPELINE</span>
-                <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
-                <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
               </span>
             </nav>
           </div>

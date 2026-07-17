@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // The tracking hub — the only team-wide surface. Day / Week / Month pages
 // (step back through history with the arrows), each showing the goal, the
@@ -32,16 +32,21 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Guard against a slow older fetch overwriting a newer one — the period,
+  // offset, and scope controls are all rapidly clickable.
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true); setError(null);
     try {
       const res = await fetch(`/api/hq?period=${period}&offset=${offset}&scope=${scope}`);
       const d = await res.json();
+      if (seq !== loadSeq.current) return;
       if (!res.ok) throw new Error(d.message || `Request failed (${res.status})`);
       setData(d);
     } catch (e) {
-      setError(e.message);
-    } finally { setLoading(false); }
+      if (seq === loadSeq.current) setError(e.message);
+    } finally { if (seq === loadSeq.current) setLoading(false); }
   }, [period, offset, scope]);
 
   useEffect(() => { load(); }, [load]);
