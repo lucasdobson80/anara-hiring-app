@@ -54,8 +54,14 @@ export async function GET() {
       .filter((c) => ONBOARD_STAGES.includes(c.status))
       .sort((a, b) => new Date(b.lastEdited) - new Date(a.lastEdited));
 
-    // stageEvents served their purpose — don't bloat the payload
-    const strip = (c) => { const { stageEvents, ...rest } = c; return rest; };
+    // Most recent "Contacted" stamp — powers the "no reply, tuck it away"
+    // collapse in Onboard. Computed here so we don't ship the full events.
+    const contactedAtOf = (c) => {
+      const dates = (c.stageEvents || []).filter((e) => e.status === "Contacted").map((e) => e.date).sort();
+      return dates.length ? dates[dates.length - 1] : null;
+    };
+    // stageEvents served their purpose — strip them, keep the one date we need
+    const strip = (c) => { const { stageEvents, ...rest } = c; return { ...rest, contactedAt: contactedAtOf(c) }; };
     return NextResponse.json({ counts, queue: queue.map(strip), roster: roster.map(strip), user, team: TEAM });
   } catch (e) {
     return NextResponse.json(

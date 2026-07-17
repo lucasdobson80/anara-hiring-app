@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, renderDm, DEFAULT_DM, igWelcome, welcomeEmail, mailtoLink,
+  firstNameOf, renderDm, DEFAULT_MESSAGES, igWelcome, mailtoLink,
   INTERVIEW_INTRO, INTERVIEW_CLOSE, CONTRACT_STEPS, IG_SETUP,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
+import MessagesTab from "./messages-tab";
 import { IconX, IconCheck, IconExt } from "./icons";
 
 // =============================================================
@@ -39,6 +40,11 @@ function useCopy() {
   return { copy, copiedKey, fallbackText, setFallbackText };
 }
 
+// ---- signing wizard state (per creator, kept in localStorage) ----
+const SIGN_STEPS = ["contract", "tracker", "groupchats", "email"];
+const readSign = (id) => { try { return JSON.parse(localStorage.getItem("cd_sign_" + id) || "{}"); } catch { return {}; } };
+const writeSign = (id, v) => { try { localStorage.setItem("cd_sign_" + id, JSON.stringify(v)); } catch {} };
+
 export default function AnaraCastingDesk() {
   const [tab, setTab] = useState("hq");
   const [queue, setQueue] = useState([]);
@@ -48,6 +54,7 @@ export default function AnaraCastingDesk() {
   const [selected, setSelected] = useState(null);
   const [onboardSearch, setOnboardSearch] = useState("");
   const [onboardStage, setOnboardStage] = useState("All");
+  const [showStale, setShowStale] = useState(false); // Contacted, no reply >2wk
   const [user, setUser] = useState(null);
   const [team, setTeam] = useState(["lucas", "laia", "alba"]);
   const [loading, setLoading] = useState(true);
@@ -58,32 +65,14 @@ export default function AnaraCastingDesk() {
   const [syncMsg, setSyncMsg] = useState(null);
   const { copy, copiedKey, fallbackText, setFallbackText } = useCopy();
 
-  // Personal outreach DM: every account has its own template ({first} token),
-  // fetched once and used by every copy-DM / email button.
-  const [dmTpl, setDmTpl] = useState(null);
-  const [dmOpen, setDmOpen] = useState(false);
-  const [dmDraft, setDmDraft] = useState("");
-  const [dmSaving, setDmSaving] = useState(false);
-  const [dmErr, setDmErr] = useState(null);
+  // Personal message bank ({first} token) — the Outreach DM and Welcome email
+  // here feed the Review / Onboard buttons. Managed on the Messages tab.
+  const [messages, setMessages] = useState(DEFAULT_MESSAGES);
   useEffect(() => {
-    fetch("/api/settings/dm").then((r) => r.json()).then((d) => { if (d.template) setDmTpl(d.template); }).catch(() => {});
+    fetch("/api/settings/messages").then((r) => r.json()).then((d) => { if (d.messages) setMessages(d.messages); }).catch(() => {});
   }, []);
-  const dmFor = useCallback((first) => renderDm(dmTpl, first), [dmTpl]);
-  const saveDm = async () => {
-    setDmSaving(true); setDmErr(null);
-    try {
-      const res = await fetch("/api/settings/dm", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template: dmDraft }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      setDmTpl(data.template);
-      setDmOpen(false);
-    } catch (e) {
-      setDmErr(e.message);
-    } finally { setDmSaving(false); }
-  };
+  const dmFor = useCallback((first) => renderDm(messages["Outreach DM"], first), [messages]);
+  const welcomeFor = useCallback((first) => renderDm(messages["Welcome email"], first), [messages]);
 
   // Review + Onboard always show your OWN pipeline (team view lives in HQ).
   const loadSeq = useRef(0);
@@ -277,6 +266,23 @@ export default function AnaraCastingDesk() {
   const stageOf = (c) => pending[c.id] || c.status;
   const moveStage = (c, stage) => setPending((p) => ({ ...p, [c.id]: stage }));
 
+  // Signing-wizard progress (localStorage); signVer forces a re-read on change
+  const [signVer, setSignVer] = useState(0);
+  const bumpSign = () => setSignVer((v) => v + 1);
+  const signProgress = (id) => {
+    void signVer; // re-read whenever a step is toggled
+    const s = readSign(id);
+    return { done: SIGN_STEPS.filter((k) => s[k]).length, total: SIGN_STEPS.length };
+  };
+  const appendOnboardNote = async (id) => {
+    try {
+      await fetch("/api/onboard-note", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: id }),
+      });
+    } catch { /* best-effort — the checklist state is the source of truth */ }
+  };
+
   const displayCounts = STAGES.map((s) => {
     let n = counts[s] || 0;
     Object.entries(pending).forEach(([id, v]) => {
@@ -324,6 +330,7 @@ export default function AnaraCastingDesk() {
                 <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
                 <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
               </span>
+              <button className={tab === "messages" ? "tab on" : "tab"} onClick={() => setTab("messages")}>Messages</button>
             </nav>
           </div>
         </div>
@@ -368,9 +375,6 @@ export default function AnaraCastingDesk() {
               <div className="viewtoggle">
                 <button className={view === "one" ? "chip on" : "chip"} onClick={() => setView("one")}>One by one</button>
                 <button className={view === "browse" ? "chip on" : "chip"} onClick={() => setView("browse")}>Browse all</button>
-                <button className="chip" style={{ marginLeft: "auto" }} onClick={() => { setDmDraft(dmTpl || DEFAULT_DM); setDmErr(null); setDmOpen(true); }}>
-                  Edit my DM
-                </button>
               </div>
 
               {loading && (
@@ -490,6 +494,8 @@ export default function AnaraCastingDesk() {
 
           {tab === "hq" && <HqTab team={team} user={user} />}
 
+          {tab === "messages" && <MessagesTab messages={messages} onSaved={setMessages} user={user} copy={copy} copiedKey={copiedKey} />}
+
 
           {tab === "onboard" && (
             <>
@@ -535,17 +541,46 @@ export default function AnaraCastingDesk() {
                           (!q || (c.name || "").toLowerCase().includes(q) || (c.handle || "").toLowerCase().includes(q))
                       );
                       if (!members.length) return null;
+                      const rowOf = (c) => {
+                        const prog = stage === "Signed" ? signProgress(c.id) : null;
+                        return (
+                          <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
+                            <span className="rname">{c.name || c.handle}</span>
+                            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              {prog && <span className={"sign-badge" + (prog.done === prog.total ? " full" : "")}>{prog.done === prog.total ? "✓ onboarded" : `${prog.done}/${prog.total}`}</span>}
+                              <span className="badge">{stageOf(c)}</span>
+                            </span>
+                          </button>
+                        );
+                      };
+                      // Contacted with no reply for 2+ weeks tucks away — still
+                      // in the system, just hidden until they move stage.
+                      if (stage === "Contacted") {
+                        const isStale = (c) => {
+                          const ref = c.contactedAt || c.lastEdited;
+                          return ref && Date.now() - Date.parse(ref) >= 14 * 86400000;
+                        };
+                        const fresh = members.filter((c) => !isStale(c));
+                        const stale = members.filter(isStale);
+                        return (
+                          <div key={stage}>
+                            <div className="roster-head"><span>CONTACTED</span><span>{members.length}</span></div>
+                            {fresh.map(rowOf)}
+                            {stale.length > 0 && (
+                              <>
+                                <button className="stale-toggle" onClick={() => setShowStale((s) => !s)}>
+                                  {showStale ? "▾" : "▸"} No reply · older than 2 weeks ({stale.length})
+                                </button>
+                                {showStale && stale.map(rowOf)}
+                              </>
+                            )}
+                          </div>
+                        );
+                      }
                       return (
                         <div key={stage}>
                           <div className="roster-head"><span>{stage.toUpperCase()}</span><span>{members.length}</span></div>
-                          {members.map((c) => (
-                            <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
-                              <span className="rname">{c.name || c.handle}</span>
-                              <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                <span className="badge">{stageOf(c)}</span>
-                              </span>
-                            </button>
-                          ))}
+                          {members.map(rowOf)}
                         </div>
                       );
                     })}
@@ -588,7 +623,14 @@ export default function AnaraCastingDesk() {
                                   <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{s}</button>
                                 ))}
                               </div>
-                              <StagePack stage={stage} first={first} email={c.email} copy={copy} copiedKey={copiedKey} dmFor={dmFor} />
+                              <StagePack
+                                stage={stage} first={first} email={c.email}
+                                copy={copy} copiedKey={copiedKey} dmFor={dmFor}
+                                welcomeText={welcomeFor(first)}
+                                signState={readSign(c.id)}
+                                onSign={(next) => { writeSign(c.id, next); bumpSign(); }}
+                                onOnboarded={() => appendOnboardNote(c.id)}
+                              />
                             </>
                           )}
                         </div>
@@ -613,32 +655,11 @@ export default function AnaraCastingDesk() {
         </div>
       )}
 
-      {dmOpen && (
-        <div className="modal-back" onClick={() => setDmOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="eyebrow">MY OUTREACH DM ({(user || "me").toUpperCase()})</div>
-            <p className="soft" style={{ fontSize: 13, margin: 0, lineHeight: 1.55 }}>
-              This is what your Copy outreach DM and email buttons send. Write <span className="mono">{"{first}"}</span>{" "}
-              wherever the creator&apos;s first name should go (becomes &quot;there&quot; when we don&apos;t have one).
-              Keep blank lines between paragraphs — they survive the copy.
-            </p>
-            <textarea value={dmDraft} onChange={(e) => setDmDraft(e.target.value)} />
-            {dmErr && <div className="banner bad" style={{ borderRadius: 10 }}>{dmErr}</div>}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-              <button className="ghost" onClick={() => setDmDraft(DEFAULT_DM)}>Reset to company default</button>
-              <button className="ghost" onClick={() => setDmOpen(false)}>Cancel</button>
-              <button className="primary" onClick={saveDm} disabled={dmSaving || !dmDraft.trim()}>
-                {dmSaving ? "Saving…" : "Save my DM"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function StagePack({ stage, first, email, copy, copiedKey, dmFor }) {
+function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -646,7 +667,7 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor }) {
   if (stage === "Approved") return (
     <div className="pack">
       <div className="eyebrow">NEXT MOVE: SEND THE DM{email ? " + EMAIL" : ""}</div>
-      <p className="soft">Follow them on TikTok first, then DM from your account — your personal template, editable under Review → Edit my DM.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
+      <p className="soft">Follow them on TikTok first, then DM from your account — your personal template, editable under the Messages tab.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
       <C k="p-dm" text={dmFor(first)}>Copy outreach DM</C>
       {email && (
         <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, dmFor(first))} target="_blank" rel="noreferrer" onClick={() => copy("p-emaildm", dmFor(first))}>
@@ -681,28 +702,60 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor }) {
       <p className="soft">Get their full name in the chat before the call ends — you need it for the contract. Then move them to Signed and run onboarding immediately.</p>
     </div>
   );
-  // Signed: the onboarding pack
-  return (
-    <div className="pack">
-      <div className="eyebrow">SIGNED — ONBOARD NOW, RIGHT AFTER THE CALL</div>
-      <div className="packsec">1 · Tracker</div>
-      <p className="soft">Add a row with full name + all fields. Assign the team lead with the smaller column (Chart view), matching postgrad vs undergrad fit. Leave the tax column to Alba.</p>
-      <L href={LINKS.tracker}>Creator Tracker</L>
-      <div className="packsec">2 · Contract</div>
+  // Signed: the onboarding wizard — tick each step as you go; state persists
+  // per creator so you can be interrupted and pick up exactly where you left.
+  const s = signState || {};
+  const steps = [
+    { key: "contract", label: "Contract", body: (<>
       <C k="p-contract" text={CONTRACT_STEPS}>Copy contract steps</C>
       <L href={LINKS.contractTemplate}>Contract template</L>
-      <div className="packsec">3 · IG chat</div>
+    </>) },
+    { key: "tracker", label: "Add tracker row", body: (<>
+      <L href={LINKS.tracker}>Open Creator Tracker</L>
+      <p className="soft" style={{ margin: "4px 0 0", fontSize: 12.5 }}>Full name + all fields; leave the tax column to Alba.</p>
+    </>) },
+    { key: "groupchats", label: "Group chats", body: (<>
       <C k="p-igsetup" text={IG_SETUP}>Copy chat setup steps</C>
       <C k="p-igmsg" text={igWelcome(first)}>Copy welcome message</C>
-      <L href={LINKS.celebrationsChat}>Celebrations chat link</L>
-      <L href={LINKS.announcementsChat}>Announcements chat link</L>
-      <div className="packsec">4 · Email</div>
-      <C k="p-email" text={welcomeEmail(first)}>Copy welcome email (CC alba@anara.com)</C>
-      <div className="packsec">Reference</div>
-      <L href={LINKS.onboardingChecklist}>Onboarding Checklist</L>
-      <L href={LINKS.demoGuide}>Product demo guide</L>
-      <L href={LINKS.guide}>Full hiring guide</L>
-      <p className="soft">They join the weekly Tuesday group meeting after their trial week.</p>
+      <L href={LINKS.celebrationsChat}>Celebrations chat</L>
+      <L href={LINKS.announcementsChat}>Announcements chat</L>
+    </>) },
+    { key: "email", label: "Welcome email", body: (<>
+      <C k="p-email" text={welcomeText}>Copy welcome email (CC alba@anara.com)</C>
+      {email && (
+        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, welcomeText)} target="_blank" rel="noreferrer" onClick={() => copy("p-emailsend", welcomeText)}>
+          {copiedKey === "p-emailsend" ? "Email opened · copied ✓" : `Email ${email}`}
+        </a>
+      )}
+    </>) },
+  ];
+  const done = steps.filter((st) => s[st.key]).length;
+  const allDone = done === steps.length;
+  const toggle = (key) => onSign({ ...s, [key]: !s[key] });
+  return (
+    <div className="pack">
+      <div className="eyebrow">SIGNED — ONBOARD NOW ({done}/{steps.length})</div>
+      {steps.map((st, i) => (
+        <div key={st.key} className={"sign-step" + (s[st.key] ? " done" : "")}>
+          <button className="sign-check" onClick={() => toggle(st.key)} aria-label={s[st.key] ? "Mark incomplete" : "Mark done"}>
+            {s[st.key] ? <IconCheck /> : <span className="sign-num">{i + 1}</span>}
+          </button>
+          <div className="sign-body">
+            <div className="sign-label">{st.label}</div>
+            {st.body}
+          </div>
+        </div>
+      ))}
+      {allDone && (
+        s.doneNoted ? (
+          <p className="soft" style={{ color: "#3ECF8E" }}>✓ Fully onboarded — logged to their Notion page. They join the weekly Tuesday meeting after trial week.</p>
+        ) : (
+          <button className="primary" style={{ marginTop: 4 }} onClick={() => { onOnboarded(); onSign({ ...s, doneNoted: true }); }}>
+            ✓ Mark fully onboarded
+          </button>
+        )
+      )}
+      <L href={LINKS.onboardingChecklist}>Full onboarding checklist</L>
     </div>
   );
 }

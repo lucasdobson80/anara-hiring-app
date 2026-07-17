@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 // The tracking hub — the only team-wide surface. Day / Week / Month pages
 // (step back through history with the arrows), each showing the goal, the
-// Approved→Signed funnel, a per-account table, and the all-time pipeline.
+// Approved→Signed funnel, and — under Team stats — a per-account table.
 // My stats vs Team stats is the only place that toggle lives now.
 
 const FUNNEL = [
@@ -14,7 +14,6 @@ const FUNNEL = [
   ["interview", "Interview"],
   ["signed", "Signed"],
 ];
-const ALL_TIME_STAGES = ["New", "Approved", "Contacted", "Replied", "Interview", "Signed", "Rejected"];
 const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"]];
 
 // "Today" / "This week" etc. when current, "Yesterday" / "Last week" at -1
@@ -61,8 +60,6 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
   const signed = data?.signed || 0;
   const pct = Math.min(100, Math.round((signed / goal) * 100));
   const maxBar = Math.max(1, ...FUNNEL.map(([k]) => f[k] || 0));
-  const allTime = data?.allTime || {};
-  const allTimeMax = Math.max(1, ...ALL_TIME_STAGES.map((s) => allTime[s] || 0));
   const rel = REL[period]?.[String(offset)];
 
   return (
@@ -121,36 +118,25 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
             <p className="soft" style={{ fontSize: 11.5, margin: "10px 0 0" }}>counted from status changes saved in the app</p>
           </div>
 
-          <div className="card hq-panel" style={{ gridColumn: "1 / -1" }}>
-            <div className="eyebrow">BY TEAM MEMBER · {(rel || data?.label || "").toUpperCase()}</div>
-            <div className="hq-acct-scroll">
-              <div className="hq-acct hq-acct-head">
-                <span></span>
-                {FUNNEL.map(([k, label]) => <span key={k} className="mono">{label.toLowerCase()}</span>)}
+          {scope === "all" && (
+            <div className="card hq-panel" style={{ gridColumn: "1 / -1" }}>
+              <div className="eyebrow">BY TEAM MEMBER · {(rel || data?.label || "").toUpperCase()}</div>
+              <div className="hq-acct-scroll">
+                <div className="hq-acct hq-acct-head">
+                  <span></span>
+                  {FUNNEL.map(([k, label]) => <span key={k} className="mono">{label.toLowerCase()}</span>)}
+                </div>
+                {team.map((m) => (
+                  <div key={m} className={"hq-acct" + (m === me ? " me" : "")}>
+                    <span style={{ textTransform: "capitalize" }}>{m}</span>
+                    {FUNNEL.map(([k]) => (
+                      <span key={k} className={"mono" + (k === "signed" ? " strong" : "")}>{data?.perOwner?.[m]?.[k] ?? 0}</span>
+                    ))}
+                  </div>
+                ))}
               </div>
-              {team.map((m) => (
-                <div key={m} className={"hq-acct" + (m === me ? " me" : "")}>
-                  <span style={{ textTransform: "capitalize" }}>{m}</span>
-                  {FUNNEL.map(([k]) => (
-                    <span key={k} className={"mono" + (k === "signed" ? " strong" : "")}>{data?.perOwner?.[m]?.[k] ?? 0}</span>
-                  ))}
-                </div>
-              ))}
             </div>
-          </div>
-
-          <div className="card hq-panel" style={{ gridColumn: "1 / -1" }}>
-            <div className="eyebrow">ALL-TIME PIPELINE{scope === "all" ? " · WHOLE TEAM" : " · MINE"}</div>
-            <div className="hq-funnel">
-              {ALL_TIME_STAGES.map((s) => (
-                <div key={s} className="hq-frow">
-                  <span className="hq-flabel">{s}</span>
-                  <div className="hq-fbars"><div className="hq-fbar all" style={{ width: `${((allTime[s] || 0) / allTimeMax) * 100}%` }} /></div>
-                  <span className="mono hq-fnums"><b>{allTime[s] || 0}</b></span>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       )}
 

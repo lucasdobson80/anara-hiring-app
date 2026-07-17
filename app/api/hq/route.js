@@ -5,7 +5,6 @@ import { currentUser, TEAM } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 const FUNNEL = ["Approved", "Contacted", "Replied", "Interview", "Signed"];
-const ALL_TIME_STAGES = ["New", "Approved", "Contacted", "Replied", "Interview", "Signed", "Rejected"];
 
 // Per-person signing goal by period (Day 2, Week 10, Month 40); the team
 // goal is this × headcount, so it scales as accounts are added.
@@ -81,18 +80,13 @@ export async function GET(request) {
     const perOwner = {};
     for (const m of TEAM) perOwner[m] = periodFunnel(all.filter((c) => c.owner === m), from, to);
 
-    // Current-status snapshot for the all-time panel (scope-aware).
-    const allTime = {};
-    for (const s of ALL_TIME_STAGES) allTime[s] = 0;
-    for (const c of scoped) if (allTime[c.status] != null) allTime[c.status] += 1;
-
     const perPerson = GOAL_PER_PERSON[period];
     const goal = scope === "all" ? perPerson * TEAM.length : perPerson;
 
     return NextResponse.json({
       period, offset, scope, user, team: TEAM,
       label: labelFor(period, from), from, to, isCurrent: offset === 0,
-      funnel, perOwner, allTime,
+      funnel, perOwner,
       goalPerPerson: perPerson, goal, signed: funnel.signed,
     });
   } catch (e) {
