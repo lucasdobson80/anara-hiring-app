@@ -1,21 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { DEFAULT_MESSAGES, DEFAULT_MESSAGE_NAMES, MESSAGE_GROUPS, isLinkMessage } from "@/lib/templates";
+import { useState, useEffect, useRef } from "react";
+import { DEFAULT_MESSAGES, DEFAULT_MESSAGE_NAMES, MESSAGE_GROUPS, isLinkMessage, isRichMessage, htmlToText } from "@/lib/templates";
+
+// Rich (HTML) editor — keeps pasted links + bullets. Uncontrolled: sets its
+// HTML once on mount, so remount (via key) is how the parent updates it.
+function RichField({ html, onChange }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.innerHTML = html || ""; }, []);
+  return (
+    <div
+      ref={ref}
+      className="input msg-area msg-rich"
+      contentEditable
+      suppressContentEditableWarning
+      onInput={() => onChange(ref.current.innerHTML)}
+    />
+  );
+}
 
 // Personal message bank / settings page — a fixed set of outreach and
 // onboarding copy, grouped. {first} is swapped for the creator's first name
 // wherever these are used in Review / Onboard. Entries whose name ends in
 // "link" are single URLs.
 
-export default function MessagesTab({ messages, onSaved, user, copy, copiedKey }) {
+export default function MessagesTab({ messages, onSaved, user, copy, copyRich, copiedKey }) {
   const [drafts, setDrafts] = useState(messages || DEFAULT_MESSAGES);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
   const [savedName, setSavedName] = useState(null);
+  const [richKey, setRichKey] = useState(0); // bump to remount the rich editor
 
-  // Re-sync when the page's copy updates (e.g. after our own save)
-  useEffect(() => { if (messages) setDrafts(messages); }, [messages]);
+  // Re-sync when the page's copy updates (e.g. our fetch resolves / a save)
+  useEffect(() => { if (messages) { setDrafts(messages); setRichKey((k) => k + 1); } }, [messages]);
 
   const save = async (justSaved) => {
     setSaving(true); setErr(null);
@@ -37,8 +54,14 @@ export default function MessagesTab({ messages, onSaved, user, copy, copiedKey }
     } finally { setSaving(false); }
   };
 
+  const resetOne = (name) => {
+    setDrafts((d) => ({ ...d, [name]: DEFAULT_MESSAGES[name] }));
+    if (isRichMessage(name)) setRichKey((k) => k + 1);
+  };
+
   const card = (name) => {
     const link = isLinkMessage(name);
+    const rich = isRichMessage(name);
     const val = drafts[name] ?? "";
     return (
       <div key={name} className="card msg-card">
@@ -46,14 +69,24 @@ export default function MessagesTab({ messages, onSaved, user, copy, copiedKey }
           <div className="msg-name">{name}</div>
           <div className="msg-actions">
             {val !== DEFAULT_MESSAGES[name] && (
-              <button className="ghost small" onClick={() => setDrafts((d) => ({ ...d, [name]: DEFAULT_MESSAGES[name] }))}>Reset to default</button>
+              <button className="ghost small" onClick={() => resetOne(name)}>Reset to default</button>
             )}
-            <button className="ghost small" onClick={() => copy("msg-" + name, val)}>
+            <button
+              className="ghost small"
+              onClick={() => (rich ? copyRich("msg-" + name, val, htmlToText(val)) : copy("msg-" + name, val))}
+            >
               {copiedKey === "msg-" + name ? "Copied ✓" : "Copy"}
             </button>
           </div>
         </div>
-        {link ? (
+        {rich ? (
+          <>
+            <RichField key={richKey} html={val} onChange={(h) => setDrafts((d) => ({ ...d, [name]: h }))} />
+            <p className="soft" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
+              Paste your formatted email here — hyperlinks and bullet points are kept. Use <span className="mono">{"{first}"}</span> for the creator&apos;s name.
+            </p>
+          </>
+        ) : link ? (
           <input
             className="input"
             placeholder="https://…"

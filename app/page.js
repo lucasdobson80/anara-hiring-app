@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, renderDm, DEFAULT_MESSAGES, mailtoLink, stageLabel,
+  firstNameOf, renderDm, DEFAULT_MESSAGES, mailtoLink, stageLabel, htmlToText,
   INTERVIEW_INTRO, INTERVIEW_CLOSE,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
@@ -37,7 +37,22 @@ function useCopy() {
     if (ok) { setCopiedKey(key); setTimeout(() => setCopiedKey(null), 1600); }
     else setFallbackText(text);
   };
-  return { copy, copiedKey, fallbackText, setFallbackText };
+  // Rich copy — writes HTML so links + bullets survive a paste into Gmail,
+  // with a plain-text alternative for plain targets.
+  const copyRich = async (key, html, plain) => {
+    let ok = false;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" }),
+      })]);
+      ok = true;
+    } catch { ok = false; }
+    if (!ok) { try { await navigator.clipboard.writeText(plain); ok = true; } catch { ok = false; } }
+    if (ok) { setCopiedKey(key); setTimeout(() => setCopiedKey(null), 1600); }
+    else setFallbackText(plain);
+  };
+  return { copy, copyRich, copiedKey, fallbackText, setFallbackText };
 }
 
 // ---- signing wizard state (per creator, kept in localStorage) ----
@@ -63,7 +78,7 @@ export default function AnaraCastingDesk() {
   const [pending, setPending] = useState({}); // pageId -> new status
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
-  const { copy, copiedKey, fallbackText, setFallbackText } = useCopy();
+  const { copy, copyRich, copiedKey, fallbackText, setFallbackText } = useCopy();
 
   // Personal message bank ({first} token) — the Outreach DM and Welcome email
   // here feed the Review / Onboard buttons. Managed on the Messages tab.
@@ -494,7 +509,7 @@ export default function AnaraCastingDesk() {
 
           {tab === "hq" && <HqTab team={team} user={user} />}
 
-          {tab === "messages" && <MessagesTab messages={messages} onSaved={setMessages} user={user} copy={copy} copiedKey={copiedKey} />}
+          {tab === "messages" && <MessagesTab messages={messages} onSaved={setMessages} user={user} copy={copy} copyRich={copyRich} copiedKey={copiedKey} />}
 
 
           {tab === "onboard" && (
@@ -625,8 +640,8 @@ export default function AnaraCastingDesk() {
                               </div>
                               <StagePack
                                 stage={stage} first={first} email={c.email}
-                                copy={copy} copiedKey={copiedKey} dmFor={dmFor}
-                                welcomeText={welcomeFor(first)}
+                                copy={copy} copyRich={copyRich} copiedKey={copiedKey} dmFor={dmFor}
+                                welcomeHtml={welcomeFor(first)}
                                 welcomeMsg={renderDm(messages["Welcome message"], first)}
                                 contractLink={messages["Contract template link"]}
                                 trialLink={messages["Trial videos link"]}
@@ -662,7 +677,7 @@ export default function AnaraCastingDesk() {
   );
 }
 
-function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
+function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welcomeHtml, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -725,12 +740,11 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, w
       <C k="p-announce" text={LINKS.announcementsChat}>Copy Announcements chat link</C>
     </>) },
     { key: "email", label: "Welcome email", body: (<>
-      <C k="p-email" text={welcomeText}>Copy welcome email (CC alba@anara.com)</C>
-      {email && (
-        <a className="res copybtn" style={{ display: "block" }} href={mailtoLink(email, welcomeText)} target="_blank" rel="noreferrer" onClick={() => copy("p-emailsend", welcomeText)}>
-          {copiedKey === "p-emailsend" ? "Email opened · copied ✓" : `Email ${email}`}
-        </a>
-      )}
+      <button className="res copybtn" onClick={() => copyRich("p-email", welcomeHtml, htmlToText(welcomeHtml))}>
+        {copiedKey === "p-email" ? "Copied ✓ — paste into Gmail" : "Copy welcome email"}
+      </button>
+      {email && <L href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`}>Open Gmail to {email}</L>}
+      <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Add the subject &amp; CC yourself, then paste (Cmd/Ctrl+V) — links &amp; bullets are kept.</p>
     </>) },
   ];
   const done = steps.filter((st) => s[st.key]).length;

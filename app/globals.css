@@ -327,3 +327,11 @@ h1 { align-self: center; }
 .msg-tag { font-family: 'Spline Sans Mono', monospace; font-size: 9.5px; letter-spacing: .1em; color: #98A0B3; border: 1px solid #272D3A; border-radius: 999px; padding: 1px 7px; text-transform: uppercase; }
 .msg-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .msg-area { min-height: 150px; resize: vertical; font-family: 'Spline Sans Mono', monospace; font-size: 12.5px; line-height: 1.5; }
+
+/* Rich (HTML) message editor — keeps pasted links & bullets */
+.msg-rich { min-height: 240px; overflow-y: auto; line-height: 1.5; font-family: inherit; font-size: 13.5px; }
+.msg-rich:empty::before { content: "Paste your formatted welcome email here…"; color: #4a5162; }
+.msg-rich:focus { outline: none; border-color: #6E7BFF; }
+.msg-rich a { color: #6E7BFF; }
+.msg-rich ul { padding-left: 20px; margin: 8px 0; }
+.msg-rich p { margin: 8px 0; }
