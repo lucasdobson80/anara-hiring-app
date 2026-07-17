@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { hasApifyToken, runSyncItems, aggregateCandidates, runInstagram, isIgReserved } from "@/lib/apify";
-import { hasAnthropicKey, scoreCandidates } from "@/lib/scoring";
 import { fetchAllCreators, createCreator, updateStatus, normHandle } from "@/lib/notion";
 import { currentUser } from "@/lib/auth";
 
-// One synchronous scrape of a handful of hand-picked profiles + scoring.
-export const maxDuration = 300;
+// Hand-picked adds insert instantly (no scrape, no scoring); only pasted
+// video/reel links hit Apify, purely to resolve which creator posted them.
+export const maxDuration = 120;
 
 const MAX_PROFILES = 30;
 
@@ -57,12 +57,6 @@ function parseInput(text) {
 }
 
 export async function POST(request) {
-  if (!hasApifyToken()) {
-    return NextResponse.json({ error: "setup", message: "APIFY_TOKEN is not set." }, { status: 503 });
-  }
-  if (!hasAnthropicKey()) {
-    return NextResponse.json({ error: "setup", message: "ANTHROPIC_API_KEY is not set." }, { status: 503 });
-  }
   let body;
   try {
     body = await request.json();
@@ -77,35 +71,56 @@ export async function POST(request) {
     );
   }
 
+  // Video/reel links are the only inputs that need Apify (to resolve which
+  // creator posted them) — profile links and handles insert instantly, free.
+  if ((postURLs.length || igPostUrls.length) && !hasApifyToken()) {
+    return NextResponse.json({ error: "setup", message: "APIFY_TOKEN is needed to resolve video links — paste profile links or @handles instead." }, { status: 503 });
+  }
+
   const owner = await currentUser();
   try {
     const candidates = [];
 
-    // TikTok
-    if (profiles.length || postURLs.length) {
-      const input = {
-        resultsPerPage: 6,
-        profileSorting: "latest",
-        shouldDownloadVideos: false,
-        shouldDownloadCovers: false,
-        shouldDownloadSubtitles: false,
-      };
-      if (profiles.length) {
-        input.profiles = profiles;
-        input.profileScrapeSections = ["videos"];
-      }
-      if (postURLs.length) input.postURLs = postURLs;
-      // Reservation on pay-per-result actors = maxItems × price: size it to
-      // what was actually pasted so small adds work even on tight plans.
-      const items = await runSyncItems(input, { maxItems: (profiles.length + postURLs.length) * 6 });
-      // Manual picks bypass the mechanical filters — the human chose them
+    // TikTok profiles: hand-picked while scrolling — no scrape, no score.
+    // The human already judged them; speed beats stats here.
+    for (const handle of profiles) {
+      candidates.push({
+        handle,
+        name: handle,
+        platform: "TikTok",
+        profileUrl: `https://www.tiktok.com/@${handle}`,
+        followers: null,
+        maxViews: null,
+        email: null,
+      });
+    }
+
+    // Instagram profiles: same instant treatment
+    for (const u of igUsernames) {
+      candidates.push({
+        handle: u,
+        name: u,
+        platform: "Instagram",
+        profileUrl: `https://www.instagram.com/${u}/`,
+        followers: null,
+        maxViews: null,
+        email: null,
+      });
+    }
+
+    // TikTok video links: minimal scrape purely to resolve the creator
+    if (postURLs.length) {
+      const items = await runSyncItems(
+        { postURLs, shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false },
+        { maxItems: postURLs.length }
+      );
       const { candidates: tk } = aggregateCandidates(items, { days: 3650, lenient: true });
       candidates.push(...tk.map((c) => ({ ...c, platform: "TikTok" })));
     }
 
-    // Instagram (profile + reel/post links)
-    if (igUsernames.length || igPostUrls.length) {
-      const ig = await runInstagram({ usernames: igUsernames, postUrls: igPostUrls });
+    // Instagram reel/post links: same — resolve the owner, nothing more
+    if (igPostUrls.length) {
+      const ig = await runInstagram({ usernames: [], postUrls: igPostUrls });
       candidates.push(...ig);
     }
 
@@ -150,37 +165,23 @@ export async function POST(request) {
     }
 
     if (fresh.length) {
-      // Score just for the card's context, then insert straight into the
-      // pipeline as Approved — you hand-picked them while scrolling, so
-      // they skip Review and land in Onboard ready to DM. LinkedIn adds
-      // have no content stats to grade, so they skip scoring entirely.
-      const toScore = fresh.filter((c) => c.platform !== "LinkedIn");
-      let results = new Map();
-      try {
-        if (toScore.length) ({ results } = await scoreCandidates(toScore, 70));
-      } catch {
-        // scoring is best-effort here; still add the creators
-      }
+      // No scoring — hand-picked creators were judged by eye, and skipping
+      // the AI call makes adds instant and free.
       for (const c of fresh) {
-        const s = results.get(normHandle(c.handle));
-        const rationale = c.platform === "LinkedIn"
-          ? "Added from LinkedIn — no content stats to score; judged by eye while scrolling."
-          : s
-          ? `${s.hard_reject ? `⚠ ${s.reject_reason || "flagged"} — ` : ""}${s.rationale} (added manually)`
-          : "Added manually from organic scrolling.";
-        const niche = [...new Set([...(s?.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
+        const niche = c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [];
         await createCreator(
-          { ...c, score: s?.score ?? null, rationale, niche },
+          { ...c, score: null, rationale: "Hand-picked from organic scrolling — judged by eye.", niche },
           "Approved",
           owner
         );
         added += 1;
         addedList.push(c.handle);
-        details.push({ handle: c.handle, platform: c.platform || "TikTok", score: s?.score ?? null, followers: c.followers, email: c.email || null, rescued: false, owner });
+        details.push({ handle: c.handle, platform: c.platform || "TikTok", score: null, followers: c.followers, email: c.email || null, rescued: false, owner });
       }
     }
 
-    // Profiles the scrape couldn't resolve (typo, private, deleted)
+    // Video links the resolve-scrape couldn't attribute come back empty; the
+    // direct profile inserts are always "found".
     const found = new Set(candidates.map((c) => normHandle(c.handle)));
     const notFound = [...profiles, ...igUsernames].filter((p) => !found.has(p));
 

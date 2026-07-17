@@ -38,9 +38,10 @@ export default function OrganicTab({ onImported }) {
         <p className="soft" style={{ fontSize: 13.5, margin: "8px 0 0", lineHeight: 1.6 }}>
           Paste everything you found this session — <b>TikTok, Instagram, or LinkedIn</b> profile links,
           video/reel links, or @handles, any mix, separated by new lines, spaces, or commas (up to 30 per
-          batch). TikTok and Instagram get scraped for stats; LinkedIn profiles go in as tracked bookmarks
-          (no stats — you already judged them by eye). Everything lands straight in <b>Onboard as Approved</b>,
-          ready to DM — no Review step, and pasting someone previously rejected rescues them.
+          batch). Profile links and @handles are added <b>instantly</b> (no scraping or scoring — you already
+          judged them by eye); video/reel links take a few seconds to look up the creator. Everything lands
+          straight in <b>Onboard as Approved</b>, ready to DM, and pasting someone previously rejected
+          rescues them. Double-check handle spelling — typos become rows.
         </p>
         <textarea
           className="input note-area"
@@ -51,7 +52,7 @@ export default function OrganicTab({ onImported }) {
         />
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
           <button className="primary" onClick={add} disabled={busy || !text.trim()}>
-            {busy ? "Scraping… ~1 min" : "Add to Onboard"}
+            {busy ? "Adding…" : "Add to Onboard"}
           </button>
         </div>
         {result && !result.error && (
