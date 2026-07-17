@@ -721,8 +721,8 @@ function StagePack({ stage, first, email, copy, copiedKey, dmFor, welcomeText, w
       {trialLink
         ? <C k="p-trial" text={trialLink}>Copy Trial videos link</C>
         : <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Set the Trial videos link in Messages</p>}
-      <L href={LINKS.celebrationsChat}>Celebrations chat</L>
-      <L href={LINKS.announcementsChat}>Announcements chat</L>
+      <C k="p-celeb" text={LINKS.celebrationsChat}>Copy Celebrations chat link</C>
+      <C k="p-announce" text={LINKS.announcementsChat}>Copy Announcements chat link</C>
     </>) },
     { key: "email", label: "Welcome email", body: (<>
       <C k="p-email" text={welcomeText}>Copy welcome email (CC alba@anara.com)</C>
