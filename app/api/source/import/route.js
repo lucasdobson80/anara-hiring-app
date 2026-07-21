@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import {
-  hasApifyToken, getRun, getDatasetItems, aggregateCandidates, getRunRecord, setRunRecord,
+  hasApifyToken, getRun, getDatasetItems, aggregateCandidates, aggregateResearchers, getRunRecord, setRunRecord,
 } from "@/lib/apify";
 import { hasAnthropicKey, scoreCandidates } from "@/lib/scoring";
 import { fetchAllCreators, createCreator, handleExists, normHandle } from "@/lib/notion";
 import { currentUser } from "@/lib/auth";
+
+const COUNTRY_LABEL = { US: "US", GB: "UK", CA: "Canada", AU: "Australia" };
 
 // Scoring + sequential Notion inserts take minutes — use the full window,
 // and cap the per-invocation batch so we never hit the ceiling mid-write.
@@ -92,20 +94,25 @@ export async function POST(request) {
     // Settings travel with the run (written at launch); body values are a
     // fallback for runs launched before this existed or outside the app.
     const config = (await getRunRecord(kvId, CONFIG_KEY).catch(() => null)) || {};
+    const track = config.track === "researcher" ? "researcher" : "creator";
     const days = config.days || body.days || 30;
     const minFollowers = config.minFollowers ?? 1000;
     const maxFollowers = config.maxFollowers ?? 150000;
     const threshold = Math.min(Math.max(config.threshold || body.threshold || 70, 60), 85);
     const ugcMode = Boolean(config.ugcMode || body.ugcMode);
+    const platform = track === "researcher" ? "LinkedIn" : "TikTok";
 
     const items = await getDatasetItems(run.defaultDatasetId);
-    const { candidates, filtered, uniqueCreators } = aggregateCandidates(items, { days, minFollowers, maxFollowers });
+    const { candidates, filtered, uniqueCreators } = track === "researcher"
+      ? (() => { const r = aggregateResearchers(items); return { candidates: r.candidates, filtered: r.filtered, uniqueCreators: r.uniqueProfiles }; })()
+      : aggregateCandidates(items, { days, minFollowers, maxFollowers });
 
-    // Dedupe by canonical handle against existing TikTok creators (bulk runs
-    // are TikTok-only; a same-handle Instagram creator is a different person).
+    // Dedupe by canonical handle against existing same-platform rows across
+    // ALL tracks (a LinkedIn person bookmarked in either track is the same
+    // person; a same @handle on another platform is someone else).
     const existing = await fetchAllCreators();
     const known = new Set(
-      existing.filter((c) => (c.platform || "TikTok") === "TikTok").map((c) => normHandle(c.handle)).filter(Boolean)
+      existing.filter((c) => (c.platform || "TikTok") === platform).map((c) => normHandle(c.handle)).filter(Boolean)
     );
     const fresh = candidates.filter((c) => !known.has(normHandle(c.handle)));
 
@@ -146,7 +153,7 @@ export async function POST(request) {
       const chunk = batch.slice(i, i + CHUNK);
       let results;
       try {
-        ({ results } = await scoreCandidates(chunk, threshold, { ugcMode }));
+        ({ results } = await scoreCandidates(chunk, threshold, { ugcMode, researcher: track === "researcher" }));
       } catch (e) {
         chunkErrors.push(e.message);
         continue;
@@ -161,17 +168,34 @@ export async function POST(request) {
           belowThreshold += 1;
           misses.push({ handle: c.handle, score: s.score, rationale: s.rationale });
         }
-        const rationale = s.hard_reject ? `HARD REJECT: ${s.reject_reason || s.rationale}` : s.rationale;
-        // Mechanical for-hire signals guarantee the ugc tag even if the model skips it
-        const niche = [...new Set([...(s.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
+        let rationale = s.hard_reject ? `HARD REJECT: ${s.reject_reason || s.rationale}` : s.rationale;
+        let niche;
+        let insertCandidate = c;
+        if (track === "researcher") {
+          // Prefix the context so the card (which reads Rationale) shows role,
+          // employer, grad year and country without new Notion columns.
+          const ctx = [
+            c.position ? `${c.position}${c.company ? ` @ ${c.company}` : ""}` : c.company,
+            c.gradYear ? `grad ${c.gradYear}` : null,
+            COUNTRY_LABEL[c.countryCode] || c.countryCode,
+          ].filter(Boolean).join(" · ");
+          rationale = ctx ? `${ctx} — ${rationale}` : rationale;
+          niche = (s.niche || []).slice(0, 3);
+          // Store connections in the Followers field (card shows it as "Connections")
+          insertCandidate = { ...c, followers: c.connections ?? null, maxViews: null };
+        } else {
+          // Mechanical for-hire signals guarantee the ugc tag even if the model skips it
+          niche = [...new Set([...(s.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
+        }
         try {
           // Last line of defence against a concurrent import that slipped past
           // the lock: check right before writing.
-          if (await handleExists(c.handle, "TikTok")) { raceSkipped += 1; continue; }
+          if (await handleExists(c.handle, platform)) { raceSkipped += 1; continue; }
           await createCreator(
-            { ...c, score: s.score, rationale, niche },
+            { ...insertCandidate, score: s.score, rationale, niche },
             rejected ? "Screened" : "New",
-            owner
+            owner,
+            track
           );
           if (rejected) screened += 1;
           else inserted += 1;

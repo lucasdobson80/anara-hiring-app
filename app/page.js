@@ -72,6 +72,7 @@ export default function AnaraCastingDesk() {
   const [showStale, setShowStale] = useState(false); // Contacted, no reply >2wk
   const [user, setUser] = useState(null);
   const [team, setTeam] = useState(["lucas", "laia", "alba"]);
+  const [track, setTrack] = useState("creator"); // "creator" (UGC) | "researcher"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -89,13 +90,17 @@ export default function AnaraCastingDesk() {
   const dmFor = useCallback((first) => renderDm(messages["Outreach DM"], first), [messages]);
   const welcomeFor = useCallback((first) => renderDm(messages["Welcome email"], first), [messages]);
 
-  // Review + Onboard always show your OWN pipeline (team view lives in HQ).
+  // Review + Onboard show your OWN pipeline in the active track (team view
+  // lives in HQ). Restore the remembered track before the first fetch.
+  useEffect(() => {
+    try { const t = localStorage.getItem("cd_track"); if (t === "researcher" || t === "creator") setTrack(t); } catch {}
+  }, []);
   const loadSeq = useRef(0);
   const load = useCallback(async ({ keepPending = false } = {}) => {
     const seq = ++loadSeq.current;
     setLoading(true); setError(null); setNeedsSetup(false);
     try {
-      const res = await fetch("/api/pipeline");
+      const res = await fetch(`/api/pipeline?track=${track}`);
       const data = await res.json();
       if (seq !== loadSeq.current) return;
       if (!res.ok) {
@@ -113,9 +118,18 @@ export default function AnaraCastingDesk() {
       if (seq !== loadSeq.current) return;
       setError("Couldn't load the pipeline from Notion. " + e.message + " — press Reload to retry.");
     } finally { if (seq === loadSeq.current) setLoading(false); }
-  }, []);
+  }, [track]);
 
   useEffect(() => { load(); }, [load]);
+
+  const switchTrack = (t) => {
+    if (t === track) return;
+    setTrack(t);
+    try { localStorage.setItem("cd_track", t); } catch {}
+    setSelected(null);
+    setPending({});
+    // load() refetches automatically (track is a dep of the load callback)
+  };
 
   // ── Background run watcher ─────────────────────────────────────────
   // Sourcing runs launched from the Source tab are imported HERE, at the
@@ -312,6 +326,31 @@ export default function AnaraCastingDesk() {
 
   const fmt = (n) => n == null ? "–" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n);
 
+  // Nav + track switcher render in two places (sidebar on desktop, top bar on
+  // mobile) — functions so each spot gets its own element instances.
+  const renderNav = () => (
+    <>
+      <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>HQ</button>
+      <span className="tab-group">
+        <span className="tab-group-label">PIPELINE</span>
+        <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
+        <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
+      </span>
+      <span className="tab-group">
+        <span className="tab-group-label">FIND</span>
+        <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
+        <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
+      </span>
+      <button className={tab === "messages" ? "tab on" : "tab"} onClick={() => setTab("messages")}>Messages</button>
+    </>
+  );
+  const renderTrackSwitch = () => (
+    <div className="track-switch">
+      <button className={track === "creator" ? "on" : ""} onClick={() => switchTrack("creator")}>🎬 UGC Creators</button>
+      <button className={track === "researcher" ? "on" : ""} onClick={() => switchTrack("researcher")}>🔬 Researchers</button>
+    </div>
+  );
+
   if (needsSetup) return (
     <div className="desk">
       <div className="empty">
@@ -333,20 +372,6 @@ export default function AnaraCastingDesk() {
           <div className="title-row">
             <h1>ANARA Hiring HQ</h1>
             {user && <span className="signed-in mono" title="Signed in">{user}</span>}
-            <nav className="tabs" aria-label="Sections">
-              <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>HQ</button>
-              <span className="tab-group">
-                <span className="tab-group-label">PIPELINE</span>
-                <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
-                <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
-              </span>
-              <span className="tab-group">
-                <span className="tab-group-label">FIND</span>
-                <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
-                <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
-              </span>
-              <button className={tab === "messages" ? "tab on" : "tab"} onClick={() => setTab("messages")}>Messages</button>
-            </nav>
           </div>
         </div>
         <div className="top-actions">
@@ -356,6 +381,12 @@ export default function AnaraCastingDesk() {
           </button>
         </div>
       </header>
+
+      {/* Mobile-only nav (sidebar hides ≤900px): track switch + tabs */}
+      <div className="mobile-nav">
+        {renderTrackSwitch()}
+        <nav className="tabs" aria-label="Sections">{renderNav()}</nav>
+      </div>
 
       {syncMsg && <div className={"banner" + (/failed/i.test(syncMsg) ? " bad" : "")}>{syncMsg}</div>}
       {importToast && (
@@ -374,13 +405,17 @@ export default function AnaraCastingDesk() {
       )}
 
       <div className="frame">
-        <aside className="rail">
-          <div className="eyebrow">FUNNEL</div>
-          {displayCounts.filter(({ stage }) => stage !== "Approved" && stage !== "Rejected").map(({ stage, n }) => (
-            <div key={stage} className={"stage-row" + (stage === "New" ? " hot" : "")}>
-              <span>{stageLabel(stage)}</span><b>{n}</b>
-            </div>
-          ))}
+        <aside className="sidebar">
+          {renderTrackSwitch()}
+          <nav className="side-nav" aria-label="Sections">{renderNav()}</nav>
+          <div className="side-funnel">
+            <div className="eyebrow">{track === "researcher" ? "RESEARCHER FUNNEL" : "FUNNEL"}</div>
+            {displayCounts.filter(({ stage }) => stage !== "Approved" && stage !== "Rejected").map(({ stage, n }) => (
+              <div key={stage} className={"stage-row" + (stage === "New" ? " hot" : "")}>
+                <span>{stageLabel(stage)}</span><b>{n}</b>
+              </div>
+            ))}
+          </div>
           <p className="hint">A approve · R reject · U undo. Decisions queue locally; Save pushes them all to Notion in one go.</p>
         </aside>
 
@@ -410,7 +445,7 @@ export default function AnaraCastingDesk() {
                           <div key={c.id} className={"browse-row" + (verdict === "Approved" ? " ok" : verdict === "Rejected" ? " no" : "")}>
                             <div className="browse-main">
                               <a href={c.link || "#"} target="_blank" rel="noreferrer" className="browse-name">{c.name || c.handle} <IconExt width={12} height={12} /></a>
-                              <span className="mono soft browse-meta">{c.handle} · {fmt(c.followers)} followers · {fmt(c.views)} views</span>
+                              <span className="mono soft browse-meta">{c.handle}{c.platform === "LinkedIn" ? ` · ${fmt(c.followers)} connections` : ` · ${fmt(c.followers)} followers · ${fmt(c.views)} views`}</span>
                             </div>
                             {c.niche?.includes("ugc") && <span className="ugc-chip">🎯</span>}
                             <span className="mini-stamp mono">{c.score ?? "–"}</span>
@@ -427,7 +462,7 @@ export default function AnaraCastingDesk() {
                       })}
                     </div>
                   )}
-                  <p className="hint">Tap a name to open their TikTok and scroll their videos, then decide here. Save pushes everything to Notion in one go.</p>
+                  <p className="hint">{track === "researcher" ? "Tap a name to open their LinkedIn, then decide here." : "Tap a name to open their TikTok and scroll their videos, then decide here."} Save pushes everything to Notion in one go.</p>
                 </div>
               )}
 
@@ -463,8 +498,8 @@ export default function AnaraCastingDesk() {
                       </div>
                     </div>
                     <div className="stats">
-                      <div><b className="mono">{fmt(current.followers)}</b><label>FOLLOWERS</label></div>
-                      <div><b className="mono">{fmt(current.views)}</b><label>VIEWS (SOURCED VIDEO)</label></div>
+                      <div><b className="mono">{fmt(current.followers)}</b><label>{current.platform === "LinkedIn" ? "CONNECTIONS" : "FOLLOWERS"}</label></div>
+                      {current.platform !== "LinkedIn" && <div><b className="mono">{fmt(current.views)}</b><label>VIEWS (SOURCED VIDEO)</label></div>}
                     </div>
                     <div className="body">
                       <div className="eyebrow">WHY IT SCORED THIS WAY</div>
@@ -498,16 +533,16 @@ export default function AnaraCastingDesk() {
                     </div>
                   </article>
                 )}
-                <p className="hint">Judge with your own eyes before approving: open the profile and watch two or three videos. The score only measures what a scraper can see.</p>
+                <p className="hint">{track === "researcher" ? "Open their LinkedIn and skim the profile before approving. The score only measures what the scraper can see." : "Judge with your own eyes before approving: open the profile and watch two or three videos. The score only measures what a scraper can see."}</p>
               </>)}
             </>
           )}
 
-          {tab === "source" && <SourceTab refreshKey={importsVersion} onImported={() => load({ keepPending: pendingCount > 0 })} />}
+          {tab === "source" && <SourceTab track={track} refreshKey={importsVersion} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
-          {tab === "organic" && <OrganicTab onImported={() => load({ keepPending: pendingCount > 0 })} />}
+          {tab === "organic" && <OrganicTab track={track} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
-          {tab === "hq" && <HqTab team={team} user={user} />}
+          {tab === "hq" && <HqTab team={team} user={user} track={track} />}
 
           {tab === "messages" && <MessagesTab messages={messages} onSaved={setMessages} user={user} copy={copy} copyRich={copyRich} copiedKey={copiedKey} />}
 

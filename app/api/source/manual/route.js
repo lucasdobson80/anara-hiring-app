@@ -78,6 +78,7 @@ export async function POST(request) {
   }
 
   const owner = await currentUser();
+  const track = body.track === "researcher" ? "researcher" : "creator";
   try {
     const candidates = [];
 
@@ -172,7 +173,8 @@ export async function POST(request) {
         await createCreator(
           { ...c, score: null, rationale: "Hand-picked from organic scrolling — judged by eye.", niche },
           "Approved",
-          owner
+          owner,
+          track
         );
         added += 1;
         addedList.push(c.handle);

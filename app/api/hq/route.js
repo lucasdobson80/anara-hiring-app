@@ -64,12 +64,13 @@ export async function GET(request) {
   const period = ["day", "week", "month"].includes(url.searchParams.get("period")) ? url.searchParams.get("period") : "week";
   const offset = Math.max(-260, Math.min(0, parseInt(url.searchParams.get("offset"), 10) || 0));
   const scope = url.searchParams.get("scope") === "all" ? "all" : "mine";
+  const track = url.searchParams.get("track") === "researcher" ? "researcher" : "creator";
 
   if (!process.env.NOTION_TOKEN) {
     return NextResponse.json({ error: "setup", message: "NOTION_TOKEN is not set." }, { status: 503 });
   }
   try {
-    let all = (await fetchAllCreators()).filter((c) => c.status !== "Screened");
+    let all = (await fetchAllCreators()).filter((c) => c.status !== "Screened" && (c.track || "creator") === track);
     all = all.map((c) => ({ ...c, owner: c.owner || "lucas" }));
     const scoped = scope === "all" ? all : all.filter((c) => c.owner === user);
 
@@ -84,7 +85,7 @@ export async function GET(request) {
     const goal = scope === "all" ? perPerson * TEAM.length : perPerson;
 
     return NextResponse.json({
-      period, offset, scope, user, team: TEAM,
+      period, offset, scope, track, user, team: TEAM,
       label: labelFor(period, from), from, to, isCurrent: offset === 0,
       funnel, perOwner,
       goalPerPerson: perPerson, goal, signed: funnel.signed,

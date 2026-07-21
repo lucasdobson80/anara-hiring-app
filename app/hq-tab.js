@@ -23,7 +23,7 @@ const REL = {
   month: { 0: "This month", "-1": "Last month" },
 };
 
-export default function HqTab({ user: initialUser, team: initialTeam }) {
+export default function HqTab({ user: initialUser, team: initialTeam, track = "creator" }) {
   const [period, setPeriod] = useState("week");
   const [offset, setOffset] = useState(0);
   const [scope, setScope] = useState("mine");
@@ -32,13 +32,13 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
   const [error, setError] = useState(null);
 
   // Guard against a slow older fetch overwriting a newer one — the period,
-  // offset, and scope controls are all rapidly clickable.
+  // offset, scope, and track controls are all rapidly clickable.
   const loadSeq = useRef(0);
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/hq?period=${period}&offset=${offset}&scope=${scope}`);
+      const res = await fetch(`/api/hq?period=${period}&offset=${offset}&scope=${scope}&track=${track}`);
       const d = await res.json();
       if (seq !== loadSeq.current) return;
       if (!res.ok) throw new Error(d.message || `Request failed (${res.status})`);
@@ -46,7 +46,7 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
     } catch (e) {
       if (seq === loadSeq.current) setError(e.message);
     } finally { if (seq === loadSeq.current) setLoading(false); }
-  }, [period, offset, scope]);
+  }, [period, offset, scope, track]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -90,19 +90,22 @@ export default function HqTab({ user: initialUser, team: initialTeam }) {
         </div>
       ) : (
         <div className="hq-grid" style={loading ? { opacity: 0.55 } : undefined}>
-          <div className="card hq-goal">
-            <div className="eyebrow">{scope === "all" ? "TEAM GOAL" : "MY GOAL"} · {(rel || data?.label || "").toUpperCase()}</div>
-            <div className="hq-goal-num">
-              <b className="mono">{signed}</b>
-              <span className="soft">/ {goal} onboarded</span>
+          {/* Researchers have no weekly goal — Laia's track tracks activity only */}
+          {track !== "researcher" && (
+            <div className="card hq-goal">
+              <div className="eyebrow">{scope === "all" ? "TEAM GOAL" : "MY GOAL"} · {(rel || data?.label || "").toUpperCase()}</div>
+              <div className="hq-goal-num">
+                <b className="mono">{signed}</b>
+                <span className="soft">/ {goal} onboarded</span>
+              </div>
+              <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
+              <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
+                {signed >= goal
+                  ? "Goal hit — anything more is gravy. 🎉"
+                  : `${goal - signed} to go${scope === "all" ? ` · ${data?.goalPerPerson} per person` : ""}`}
+              </p>
             </div>
-            <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
-            <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
-              {signed >= goal
-                ? "Goal hit — anything more is gravy. 🎉"
-                : `${goal - signed} to go${scope === "all" ? ` · ${data?.goalPerPerson} per person` : ""}`}
-            </p>
-          </div>
+          )}
 
           <div className="card hq-panel">
             <div className="eyebrow">FUNNEL · {(rel || data?.label || "").toUpperCase()}</div>

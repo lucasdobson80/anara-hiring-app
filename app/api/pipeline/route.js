@@ -25,8 +25,9 @@ const MOCK = {
   ],
 };
 
-export async function GET() {
+export async function GET(request) {
   const user = await currentUser();
+  const track = new URL(request.url).searchParams.get("track") === "researcher" ? "researcher" : "creator";
   if (process.env.MOCK_PIPELINE === "1") {
     return NextResponse.json({ ...MOCK, user, team: TEAM });
   }
@@ -39,8 +40,8 @@ export async function GET() {
   try {
     // "Screened" rows are the AI-rejection ledger — dedupe data, not pipeline data
     let all = (await fetchAllCreators()).filter((c) => c.status !== "Screened");
-    // Legacy rows with no owner belong to lucas; you only ever see your own
-    const scoped = all.filter((c) => (c.owner || "lucas") === user);
+    // Your own rows, in the active track (creator vs researcher)
+    const scoped = all.filter((c) => (c.owner || "lucas") === user && (c.track || "creator") === track);
 
     const counts = {};
     for (const c of scoped) {

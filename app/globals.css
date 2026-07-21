@@ -335,3 +335,37 @@ h1 { align-self: center; }
 .msg-rich a { color: #6E7BFF; }
 .msg-rich ul { padding-left: 20px; margin: 8px 0; }
 .msg-rich p { margin: 8px 0; }
+
+/* ============================================================
+   Two-track sidebar layout (UGC Creators / Researchers)
+   ============================================================ */
+.frame { grid-template-columns: 232px 1fr; }
+.sidebar { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 84px; align-self: start; }
+
+.track-switch { display: flex; flex-direction: column; gap: 4px; background: #14171E; border: 1px solid #272D3A; border-radius: 12px; padding: 4px; }
+.track-switch button { background: none; border: none; color: #98A0B3; font-family: inherit; font-weight: 700; font-size: 13.5px; text-align: left; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background-color .16s var(--ease), color .16s var(--ease); }
+.track-switch button.on { background: #6E7BFF; color: #0E1014; }
+.track-switch button:not(.on):hover { color: #EFEDE6; background: rgba(255,255,255,.04); }
+
+.side-nav { display: flex; flex-direction: column; gap: 3px; }
+.side-nav .tab { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: none; padding: 8px 12px; border-radius: 9px; }
+.side-nav .tab.on { background: #EFEDE6; color: #0E1014; border-color: #EFEDE6; }
+.side-nav .tab:not(.on):hover { background: rgba(255,255,255,.04); color: #EFEDE6; border-color: transparent; }
+.side-nav .tab-group { display: flex; flex-direction: column; gap: 2px; border: none; border-radius: 0; padding: 8px 0 2px; align-items: stretch; }
+.side-nav .tab-group-label { padding: 0 12px 3px; }
+
+.side-funnel { border-top: 1px solid #21262f; padding-top: 12px; }
+.side-funnel .stage-row { display: flex; justify-content: space-between; padding: 7px 11px; margin: 5px 0; border: 1px solid #272D3A; border-radius: 9px; font-size: 13px; background: #14171E; }
+.side-funnel .stage-row.hot { border-color: #6E7BFF; background: rgba(110,123,255,.08); }
+.side-funnel .stage-row b { font-family: 'Spline Sans Mono', monospace; }
+
+.mobile-nav { display: none; }
+
+@media (max-width: 900px) {
+  .frame { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .mobile-nav { display: flex; flex-direction: column; gap: 10px; padding: 12px 26px; border-bottom: 1px solid #272D3A; }
+  .mobile-nav .track-switch { flex-direction: row; }
+  .mobile-nav .track-switch button { flex: 1; text-align: center; }
+}
+@media (max-width: 480px) { .mobile-nav { padding: 10px 14px; } }

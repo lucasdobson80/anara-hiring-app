@@ -59,9 +59,26 @@ const fmtWhen = (iso) => {
     " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 };
 
-export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }) {
+// Researcher run builder (LinkedIn people-search) — Laia's pharma/biotech/CRO
+// hiring. Grouped role checkboxes + countries; cost is dominated by the
+// per-full-profile charge (~$4 / 1,000).
+const RESEARCHER_ROLE_GROUPS = {
+  "Clinical & trials": ["Clinical Research Associate", "Clinical Trial Assistant", "Clinical Research Coordinator", "Clinical Data Manager", "Research Nurse"],
+  "Medical & regulatory": ["Medical Writer", "Medical Science Liaison", "Medical Affairs Associate", "Regulatory Affairs Associate", "Pharmacovigilance Associate"],
+  "Science & quality": ["Research Associate", "Biomedical Engineer", "QA Associate"],
+};
+const RESEARCHER_COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia"];
+const LI_PER_PROFILE = 0.004; // full profile
+const LI_PER_PAGE = 0.1;      // per 25-result search page
+
+export default function SourceTab({ onImported, scope = "mine", track = "creator", refreshKey = 0 }) {
   const [status, setStatus] = useState(null); // { ready, spend, runs, estPerResult }
   const [error, setError] = useState(null);
+  // Researcher form state
+  const [rRoles, setRRoles] = useState(["Medical Writer"]);
+  const [rCountries, setRCountries] = useState(["United States", "United Kingdom"]);
+  const [rActive, setRActive] = useState(false);
+  const [rMax, setRMax] = useState(100);
   const [hashtags, setHashtags] = useState(DEFAULT_HASHTAGS);
   const [searchTerms, setSearchTerms] = useState("");
   const [resultsPerPage, setResultsPerPage] = useState(60);
@@ -146,7 +163,7 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch(`/api/source/status?scope=${scope}`);
+      const res = await fetch(`/api/source/status?scope=${scope}&track=${track}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       setStatus(data);
@@ -156,7 +173,7 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
       setError("Couldn't reach Apify: " + e.message);
       return null;
     }
-  }, [scope]);
+  }, [scope, track]);
 
   useEffect(() => { loadStatus(); }, [loadStatus, refreshKey]);
 
@@ -225,6 +242,28 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       // Remember we launched it so it auto-imports the moment it succeeds
+      launchedRef.current = { ...launchedRef.current, [data.id]: true };
+      store.write("cd_runs_launched", launchedRef.current);
+      await loadStatus();
+    } catch (e) {
+      setError("Couldn't launch the run: " + e.message);
+    } finally { setLaunching(false); }
+  };
+
+  const toggleIn = (setter, list, val) => setter(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
+  const rMaxN = Math.max(5, Math.min(1000, parseInt(rMax, 10) || 0));
+  // ~1 search page per 25 results + full profile per result
+  const rCost = (Math.ceil(rMaxN / 25) * LI_PER_PAGE + rMaxN * LI_PER_PROFILE).toFixed(2);
+
+  const launchResearcher = async () => {
+    setLaunching(true); setImportResult(null);
+    try {
+      const res = await fetch("/api/source/run", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ track: "researcher", roles: rRoles, countries: rCountries, activeRecently: rActive, maxItems: rMaxN, threshold }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
       launchedRef.current = { ...launchedRef.current, [data.id]: true };
       store.write("cd_runs_launched", launchedRef.current);
       await loadStatus();
@@ -324,6 +363,54 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
         </div>
       )}
 
+      {track === "researcher" ? (
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
+          <div className="eyebrow">NEW RESEARCHER RUN (LINKEDIN)</div>
+          <p className="soft" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.55 }}>
+            Searches LinkedIn for early-career people in these roles at pharma / biotech / CRO companies in the
+            chosen countries. Senior titles, recruiters, and freelancers are filtered out; scoring judges the
+            rest (industry fit, grad year, how well they present themselves).
+          </p>
+          {Object.entries(RESEARCHER_ROLE_GROUPS).map(([group, roles]) => (
+            <div className="preset-row" key={group}>
+              <span className="eyebrow" style={{ marginRight: 4 }}>{group.toUpperCase()}</span>
+              {roles.map((role) => (
+                <button key={role} className={"chip" + (rRoles.includes(role) ? " on" : "")} onClick={() => toggleIn(setRRoles, rRoles, role)}>{role}</button>
+              ))}
+            </div>
+          ))}
+          <div className="preset-row">
+            <span className="eyebrow" style={{ marginRight: 4 }}>COUNTRIES</span>
+            {RESEARCHER_COUNTRIES.map((c) => (
+              <button key={c} className={"chip" + (rCountries.includes(c) ? " on" : "")} onClick={() => toggleIn(setRCountries, rCountries, c)}>{c}</button>
+            ))}
+          </div>
+          <div className="preset-row">
+            <button className={"chip" + (rActive ? " on" : "")} onClick={() => setRActive((v) => !v)}>
+              {rActive ? "✓ " : ""}Active on LinkedIn recently
+            </button>
+            {rActive && <span className="soft" style={{ fontSize: 12 }}>posted in the last ~30 days — more likely to reply &amp; make content</span>}
+          </div>
+          <div className="fields">
+            <label className="field">
+              <span>Max profiles</span>
+              <input className="input" type="number" value={rMax} onChange={(e) => setRMax(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Score bar (60–85)</span>
+              <input className="input" type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+            </label>
+          </div>
+          <div className="launch-row">
+            <span className="soft" style={{ fontSize: 13 }}>
+              scrape cost ~${rCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
+            </span>
+            <button className="primary" onClick={launchResearcher} disabled={launching || !rRoles.length || !rCountries.length}>
+              {launching ? "Launching…" : "Launch researcher run"}
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
         <div className="eyebrow">NEW SOURCING RUN</div>
 
@@ -476,6 +563,7 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
           </button>
         </div>
       </div>
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
         <div className="eyebrow">RECENT RUNS</div>
@@ -507,11 +595,13 @@ export default function SourceTab({ onImported, scope = "mine", refreshKey = 0 }
               <div className="run-line">
                 <span className={"badge run-" + r.status.toLowerCase()}>{r.status}</span>
                 <span className="mono soft">{fmtWhen(r.startedAt)}</span>
-                <span className="run-tags" title={r.hashtags.join(", ")}>
-                  {r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "—"}
+                <span className="run-tags" title={(r.roles?.length ? r.roles : r.hashtags).join(", ")}>
+                  {r.roles?.length
+                    ? r.roles.slice(0, 2).join(", ") + (r.roles.length > 2 ? ` +${r.roles.length - 2}` : "")
+                    : r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "—"}
                 </span>
                 <span className="mono soft run-nums">
-                  {r.videos != null ? `${r.videos} videos` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
+                  {r.videos != null ? `${r.videos} ${r.roles?.length ? "profiles" : "videos"}` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
                 </span>
                 <button className="ghost tiny" title={archived[r.id] ? "Unarchive" : "Archive"} aria-label={archived[r.id] ? "Unarchive run" : "Archive run"} onClick={() => toggleArchived(r.id)}>
                   {archived[r.id] ? <IconUndo width={13} height={13} /> : <IconX width={13} height={13} />}

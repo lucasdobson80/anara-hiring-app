@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasApifyToken, getSpend, listRuns, getRunInput, getDatasetInfo, getRunRecord, EST_USD_PER_RESULT } from "@/lib/apify";
+import { hasApifyToken, getSpend, listAllRuns, getRunInput, getDatasetInfo, getRunRecord, EST_USD_PER_RESULT } from "@/lib/apify";
 import { hasAnthropicKey } from "@/lib/scoring";
 import { currentUser } from "@/lib/auth";
 
@@ -7,13 +7,18 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const user = await currentUser();
-  const scope = new URL(request.url).searchParams.get("scope") === "all" ? "all" : "mine";
+  const params = new URL(request.url).searchParams;
+  const scope = params.get("scope") === "all" ? "all" : "mine";
+  // creator|researcher filters run cards to that track; absent (the shell
+  // watcher) sees every launched run so it can import any of them.
+  const trackParam = params.get("track");
+  const track = trackParam === "researcher" || trackParam === "creator" ? trackParam : null;
   const ready = { apify: hasApifyToken(), anthropic: hasAnthropicKey() };
   if (!ready.apify) {
     return NextResponse.json({ ready, spend: null, runs: [], estPerResult: EST_USD_PER_RESULT, user });
   }
   try {
-    const [spend, rawRuns] = await Promise.all([getSpend(), listRuns(20)]);
+    const [spend, rawRuns] = await Promise.all([getSpend(), listAllRuns(20)]);
     let runs = await Promise.all(
       rawRuns.map(async (r) => {
         const [input, dataset, importRecord, config] = await Promise.all([
@@ -24,6 +29,7 @@ export async function GET(request) {
         ]);
         return {
           runOwner: config?.owner || "lucas",
+          runTrack: config?.track || "creator",
           id: r.id,
           status: r.status,
           startedAt: r.startedAt,
@@ -31,6 +37,7 @@ export async function GET(request) {
           usageUsd: r.usageTotalUsd ?? null,
           datasetId: r.defaultDatasetId ?? null,
           hashtags: input?.hashtags || [],
+          roles: config?.roles || [],
           videos: dataset?.itemCount ?? null,
           // Server-side import state: shared across devices, unlike localStorage
           importResult: importRecord ? { done: importRecord.done, at: importRecord.at, progress: importRecord.progress || null, summary: importRecord.summary } : null,
@@ -39,6 +46,9 @@ export async function GET(request) {
     );
     // "Mine" shows only your runs; "All team" shows everyone's. Spend is shared.
     if (scope !== "all") runs = runs.filter((r) => r.runOwner === user);
+    // When a track is given, only that track's runs (the shell watcher passes
+    // none, so it still sees every launched run to import).
+    if (track) runs = runs.filter((r) => r.runTrack === track);
     return NextResponse.json({ ready, spend, estPerResult: EST_USD_PER_RESULT, runs, user, scope });
   } catch (e) {
     return NextResponse.json({ error: "apify", message: e.message }, { status: 502 });
