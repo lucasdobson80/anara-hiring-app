@@ -19,7 +19,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid #6E7BFF; outline-offs
 .primary:disabled { background: #272D3A; color: #98A0B3; cursor: default; }
 .banner { padding: 10px 26px; font-family: 'Spline Sans Mono', monospace; font-size: 12px; background: #11301f; color: #3ECF8E; }
 .banner.bad { background: #331512; color: #FF6B5E; }
-.frame { display: grid; grid-template-columns: 210px 1fr; gap: 26px; padding: 24px 26px; max-width: 1140px; margin: 0 auto; }
+/* Full-width frame: sidebar hugs the left edge of the screen; only the
+   content column is width-capped so lines stay readable. */
+.frame { display: grid; grid-template-columns: 210px 1fr; gap: 26px; padding: 24px 26px; }
+.frame > main { max-width: 950px; }
 .rail .stage-row { display: flex; justify-content: space-between; padding: 8px 11px; margin: 6px 0; border: 1px solid #272D3A; border-radius: 9px; font-size: 13px; background: #14171E; }
 .rail .stage-row.hot { border-color: #6E7BFF; background: rgba(110,123,255,.08); }
 .rail .stage-row b { font-family: 'Spline Sans Mono', monospace; }
