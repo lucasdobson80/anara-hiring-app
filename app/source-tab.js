@@ -3,45 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { IconX, IconUndo } from "./icons";
 
-const DEFAULT_HASHTAGS = "studytok, studytips, studywithme, gradschool, phdlife, gradstudent, thesis, academia";
-
-// One-click niche rotation — fresh hashtag sets are what produce genuinely
-// new creators day after day; re-running the same set mostly re-finds the
-// same top posts.
-const PRESETS = {
-  "Study": DEFAULT_HASHTAGS,
-  "Student life": "unilife, collegelife, dormlife, freshman, studentlife, uniday, campuslife, backtouni",
-  "Lifestyle": "dayinmylife, grwm, morningroutine, storytime, weekinmylife, vlog, thatgirl, resetroutine",
-  "Tech & career": "techtok, careertok, internship, corporatelife, 9to5, codinglife, worklife, firstjob",
-  "Med & nursing": "medschool, medstudent, nursingschool, nursingstudent, premed, futuredoctor, scrublife, medtok",
-};
-
-// Working UGC creators self-identify with these tags; their follower counts
-// are irrelevant (brands pay for content, not reach).
-const UGC_HASHTAGS = "ugccreator, ugccommunity, ugcportfolio, ugcexample, ugcads, ugccontent, contentcreatorforhire, ugcjourney";
-const UGC_SEARCHES = "ugc portfolio, ugc example ad";
-
-// Follower-band presets: the band is a per-run targeting decision, not a
-// buried number. Wide is the default — scoring sorts out the rest.
-const BANDS = {
-  "Nano 500–5k": [500, 5000],
-  "Small 500–15k": [500, 15000],
-  "Sweet spot 1k–60k": [1000, 60000],
-  "Wide 500–100k": [500, 100000],
-};
-
-// Candidate-yield forecast, calibrated on real imports (Jul 2026: ~4-5% of
-// scraped videos survive pre-filters, dedupe, and the 73+ score threshold).
-// Yield decays as the database grows, hence a range rather than a number.
-const YIELD_LOW = 0.03;
-const YIELD_HIGH = 0.08;
-const REVIEWS_PER_DAY = 25; // Lucas's target review pace (20-30/day)
-
-// Anara recruits skilled creators beyond the study niche, but hashtags that
-// suggest faceless/meme/edit content (or audiences far from students and
-// young professionals) still tank the yield — nudge before spend.
-const ICP_HASHTAG_HINT = /stud|grad|phd|thesis|academ|school|student|uni|college|exam|revision|nurs|med|law|productiv|note|learn|lifestyle|tech|career|vlog|grwm|dayin|storytime|selfimprove|routine|desk/i;
-const offIcpShare = (tags) => tags.length === 0 ? 0 : tags.filter((t) => !ICP_HASHTAG_HINT.test(t)).length / tags.length;
+// The creator program hires PROFESSIONAL UGC FREELANCERS now (not study/
+// lifestyle influencers). Both hunting grounds — TikTok hashtags and LinkedIn
+// job titles — are country-scoped; scoring does the UGC + country judgment.
+const UGC_COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia"];
+const CC_SHORT = { "United States": "US", "United Kingdom": "UK", Canada: "Canada", Australia: "Australia" };
+const TT_PER_RESULT = 0.005; // TikTok pay-per-result estimate
 
 // Client-side run memory (single-user app): which runs are archived, which
 // were imported and what they yielded, and which we launched and should
@@ -79,58 +46,11 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   const [rCountries, setRCountries] = useState(["United States", "United Kingdom"]);
   const [rActive, setRActive] = useState(false);
   const [rMax, setRMax] = useState(100);
-  const [hashtags, setHashtags] = useState(DEFAULT_HASHTAGS);
-  const [searchTerms, setSearchTerms] = useState("");
-  const [resultsPerPage, setResultsPerPage] = useState(60);
-  const [days, setDays] = useState(30);
-  const [maxItems, setMaxItems] = useState(500);
-  const [minFollowers, setMinFollowers] = useState(500);
-  const [maxFollowers, setMaxFollowers] = useState(15000);
-  const [threshold, setThreshold] = useState(70);
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestions, setSuggestions] = useState(null);
-  const [ugcMode, setUgcMode] = useState(false);
-
-  const toggleUgcMode = () => {
-    const next = !ugcMode;
-    setUgcMode(next);
-    if (next) {
-      setHashtags(UGC_HASHTAGS);
-      setSearchTerms(UGC_SEARCHES);
-      setMinFollowers(0);
-      setMaxFollowers(1000000);
-      setBriefNote("UGC Hunt: follower counts ignored — scoring judges ad-craft and for-hire signals instead.");
-    } else {
-      setHashtags(DEFAULT_HASHTAGS);
-      setSearchTerms("");
-      setMinFollowers(500);
-      setMaxFollowers(15000);
-      setBriefNote(null);
-    }
-  };
-  const suggestNext = async () => {
-    setSuggesting(true); setSuggestions(null);
-    try {
-      const res = await fetch("/api/source/suggest", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      setSuggestions(data.suggestions);
-    } catch (e) {
-      setSuggestions([{ title: "Couldn't suggest", hashtags: [], searchQueries: [], rationale: e.message, error: true }]);
-    } finally { setSuggesting(false); }
-  };
-
-  const useSuggestion = (s) => {
-    setHashtags(s.hashtags.join(", "));
-    setSearchTerms((s.searchQueries || []).join(", "));
-    if (s.minFollowers) setMinFollowers(s.minFollowers);
-    if (s.maxFollowers) setMaxFollowers(s.maxFollowers);
-    setSuggestions(null);
-    setBriefNote(`Loaded suggestion: ${s.title} — ${s.rationale}`);
-  };
-  const [brief, setBrief] = useState("");
-  const [briefNote, setBriefNote] = useState(null);
-  const [parsing, setParsing] = useState(false);
+  // Creator UGC form state (shared country selection, per-platform max)
+  const [cCountries, setCCountries] = useState(["United States", "United Kingdom"]);
+  const [cMaxTt, setCMaxTt] = useState(500);
+  const [cMaxLi, setCMaxLi] = useState(100);
+  const [threshold, setThreshold] = useState(73);
   const [launching, setLaunching] = useState(false);
   const [importing, setImporting] = useState(null); // runId
   const [importResult, setImportResult] = useState(null);
@@ -191,57 +111,27 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
     return () => clearInterval(pollRef.current);
   }, [status, loadStatus, lockedRuns, importing]);
 
-  const parsedHashtags = hashtags.split(",").map((h) => h.replace(/^#/, "").trim()).filter(Boolean);
-  const parsedSearchTerms = searchTerms.split(",").map((q) => q.trim()).filter(Boolean);
-  // Videos actually returned = whichever is smaller: what the hashtags and
-  // search terms can yield, or the hard cap. Cost and forecasts flow from it.
-  const sourceCount = parsedHashtags.length + parsedSearchTerms.length;
-  const expVideos = Math.min(sourceCount * (parseInt(resultsPerPage, 10) || 0), parseInt(maxItems, 10) || 0);
-  const estCost = status ? (expVideos * status.estPerResult).toFixed(2) : null;
-  // Small bands keep fewer of the scraped videos (hashtag top-posts skew
-  // big), so the forecast scales down to stay honest.
-  const bandScale = maxFollowers > 0 && maxFollowers < 20000 ? 0.6 : 1;
-  const candLow = Math.max(1, Math.round(expVideos * YIELD_LOW * bandScale));
-  const candHigh = Math.max(1, Math.round(expVideos * YIELD_HIGH * bandScale));
-  const fmtDays = (n) => (n < 0.75 ? "under a day" : n < 1.5 ? "about a day" : `~${Math.round(n)} days`);
-  const reviewLoad = candHigh > 0 ? `${fmtDays(candLow / REVIEWS_PER_DAY)}–${fmtDays(candHigh / REVIEWS_PER_DAY)}`.replace(/^(.*)–\1$/, "$1") : null;
+  const toggleIn = (setter, list, val) => setter(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
+  // Creator UGC cost estimates
+  const cMaxTtN = Math.max(10, Math.min(1500, parseInt(cMaxTt, 10) || 0));
+  const cMaxLiN = Math.max(5, Math.min(1000, parseInt(cMaxLi, 10) || 0));
+  const ttCost = (cMaxTtN * TT_PER_RESULT).toFixed(2);
+  const liCost = (Math.ceil(cMaxLiN / 25) * LI_PER_PAGE + cMaxLiN * LI_PER_PROFILE).toFixed(2);
 
-  const draftFromBrief = async () => {
-    if (!brief.trim()) return;
-    setParsing(true); setBriefNote(null);
-    try {
-      const res = await fetch("/api/source/parse", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      setHashtags(data.hashtags.join(", "));
-      setSearchTerms((data.searchQueries || []).join(", "));
-      setResultsPerPage(data.resultsPerPage);
-      setDays(data.days);
-      setMaxItems(data.maxItems);
-      if (data.minFollowers) setMinFollowers(data.minFollowers);
-      if (data.maxFollowers) setMaxFollowers(data.maxFollowers);
-      setBriefNote(data.note);
-    } catch (e) {
-      setBriefNote("Couldn't draft a config: " + e.message);
-    } finally { setParsing(false); }
-  };
-
-  const launch = async () => {
+  // One creator launcher for both hunting grounds — the run route branches on
+  // the presence of `platform`.
+  const launchCreator = async (platform) => {
     setLaunching(true); setImportResult(null);
     try {
+      const body = platform === "LinkedIn"
+        ? { platform: "LinkedIn", countries: cCountries, maxItems: cMaxLiN, threshold }
+        : { countries: cCountries, maxItems: cMaxTtN, threshold };
       const res = await fetch("/api/source/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hashtags: parsedHashtags, searchQueries: parsedSearchTerms,
-          resultsPerPage, days, maxItems, minFollowers, maxFollowers, threshold, ugcMode,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
-      // Remember we launched it so it auto-imports the moment it succeeds
       launchedRef.current = { ...launchedRef.current, [data.id]: true };
       store.write("cd_runs_launched", launchedRef.current);
       await loadStatus();
@@ -249,8 +139,6 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       setError("Couldn't launch the run: " + e.message);
     } finally { setLaunching(false); }
   };
-
-  const toggleIn = (setter, list, val) => setter(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
   const rMaxN = Math.max(5, Math.min(1000, parseInt(rMax, 10) || 0));
   // ~1 search page per 25 results + full profile per result
   const rCost = (Math.ceil(rMaxN / 25) * LI_PER_PAGE + rMaxN * LI_PER_PROFILE).toFixed(2);
@@ -283,7 +171,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       for (let pass = 0; pass < 8; pass++) {
         const res = await fetch("/api/source/import", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ runId, days, force: force && pass === 0 }),
+          body: JSON.stringify({ runId, force: force && pass === 0 }),
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
@@ -318,7 +206,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       importInFlightRef.current = false;
       setImporting(null);
     }
-  }, [days, onImported, loadStatus]);
+  }, [onImported, loadStatus]);
 
   // Auto-import of launched runs happens at the app shell (page.js), so it
   // works from any tab. This tab only launches, displays, and offers manual
@@ -411,158 +299,76 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
           </div>
         </div>
       ) : (
-      <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
-        <div className="eyebrow">NEW SOURCING RUN</div>
-
-        <div className="nl-row">
-          <input
-            className="input"
-            placeholder='Describe a run, e.g. "nursing students, smaller accounts, last 2 weeks"…'
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") draftFromBrief(); }}
-            disabled={!status.ready.anthropic}
-          />
-          <button className="ghost" onClick={draftFromBrief} disabled={parsing || !status.ready.anthropic}>
-            {parsing ? "Drafting…" : "Draft config"}
-          </button>
-          <button className="ghost" onClick={suggestNext} disabled={suggesting || !status.ready.anthropic}>
-            {suggesting ? "Thinking…" : "✨ Suggest next run"}
-          </button>
-        </div>
-
-        {suggestions && (
-          <div className="suggestions">
-            {suggestions.map((s, i) => (
-              <div key={i} className="suggestion-card">
-                <div className="suggestion-head">
-                  <b>{s.title}</b>
-                  {!s.error && <button className="chip on" onClick={() => useSuggestion(s)}>Use this</button>}
-                </div>
-                {s.hashtags.length > 0 && <div className="mono suggestion-tags">#{s.hashtags.join(" #")}</div>}
-                {s.searchQueries?.length > 0 && <div className="mono suggestion-tags">🔎 {s.searchQueries.join(" · ")}</div>}
-                <p className="soft" style={{ fontSize: 12.5, margin: "6px 0 0" }}>{s.rationale}</p>
-              </div>
+      <>
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
+          <div className="eyebrow">COUNTRIES</div>
+          <p className="soft" style={{ fontSize: 12.5, margin: "6px 0 10px" }}>
+            Shared by both searches. Exact on LinkedIn · best-effort on TikTok.
+          </p>
+          <div className="preset-row" style={{ marginTop: 0 }}>
+            {UGC_COUNTRIES.map((c) => (
+              <button key={c} className={"chip" + (cCountries.includes(c) ? " on" : "")} onClick={() => toggleIn(setCCountries, cCountries, c)}>{c}</button>
             ))}
           </div>
-        )}
-        {!status.ready.anthropic && (
-          <p className="hint" style={{ marginTop: 4 }}>
-            Natural-language drafting and scoring need <span className="mono">ANTHROPIC_API_KEY</span> — the form and launch still work.
+        </div>
+
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
+          <div className="eyebrow">HUNT UGC CREATORS ON TIKTOK</div>
+          <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
+            Scrapes a rotating set of UGC-for-hire hashtags; scoring keeps only dedicated UGC-freelancer
+            accounts in your countries. Follower counts are ignored.
           </p>
-        )}
-        {briefNote && <p className="soft" style={{ fontSize: 13, margin: "6px 0 0" }}>{briefNote}</p>}
-
-        <div className="preset-row">
-          <button className={"chip ugc-toggle" + (ugcMode ? " on" : "")} onClick={toggleUgcMode}>
-            🎯 UGC Hunt mode {ugcMode ? "ON" : "OFF"}
-          </button>
-          {ugcMode && <span className="soft" style={{ fontSize: 12 }}>hunting working UGC creators — size &amp; ratio ignored, ad-craft and for-hire signals scored</span>}
-        </div>
-        <div className="preset-row">
-          <span className="eyebrow" style={{ marginRight: 4 }}>NICHE PRESETS</span>
-          {Object.entries(PRESETS).map(([name, tags]) => (
-            <button
-              key={name}
-              className={"chip" + (hashtags === tags ? " on" : "")}
-              onClick={() => setHashtags(tags)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-        <div className="preset-row">
-          <span className="eyebrow" style={{ marginRight: 4 }}>FOLLOWER BAND</span>
-          {Object.entries(BANDS).map(([name, [lo, hi]]) => (
-            <button
-              key={name}
-              className={"chip" + (minFollowers === lo && maxFollowers === hi ? " on" : "")}
-              onClick={() => { setMinFollowers(lo); setMaxFollowers(hi); }}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-
-        <div className="fields">
-          <label className="field" style={{ gridColumn: "1 / -1" }}>
-            <span>Hashtags</span>
-            <input className="input" value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
-          </label>
-          <label className="field" style={{ gridColumn: "1 / -1" }}>
-            <span>Search terms (optional — reaches creators hashtags miss, comma-separated)</span>
-            <input
-              className="input"
-              placeholder='e.g. day in my life uni student, study vlog, how I revise'
-              value={searchTerms}
-              onChange={(e) => setSearchTerms(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span>Videos per source</span>
-            <input className="input" type="number" value={resultsPerPage} onChange={(e) => setResultsPerPage(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Active within (days)</span>
-            <input className="input" type="number" value={days} onChange={(e) => setDays(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Max total results</span>
-            <input className="input" type="number" value={maxItems} onChange={(e) => setMaxItems(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Min followers</span>
-            <input className="input" type="number" value={minFollowers} onChange={(e) => setMinFollowers(Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Max followers</span>
-            <input className="input" type="number" value={maxFollowers} onChange={(e) => setMaxFollowers(Number(e.target.value))} />
-          </label>
-          <label className="field">
-            <span>Score bar (60–85)</span>
-            <input className="input" type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
-          </label>
-        </div>
-
-        <div className="forecast">
-          <div className="eyebrow">RUN FORECAST (ESTIMATE)</div>
-          <div className="forecast-line">
-            <b className="mono">{expVideos}</b> videos from {parsedHashtags.length} hashtags{parsedSearchTerms.length > 0 && ` + ${parsedSearchTerms.length} searches`}
-            <span className="soft"> → </span>
-            <b className="mono">≈{candLow}–{candHigh}</b> new candidates in your Review queue
-            <span className="soft"> → </span>
-            {reviewLoad} of review at {REVIEWS_PER_DAY}/day
+          <div className="fields">
+            <label className="field">
+              <span>Max total results</span>
+              <input className="input" type="number" value={cMaxTt} onChange={(e) => setCMaxTt(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Score bar (60–85)</span>
+              <input className="input" type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+            </label>
           </div>
-          <p className="soft" style={{ fontSize: 12, margin: "4px 0 0" }}>
-            Based on your real import history (~3–8% of videos survive filtering, dedupe, and the 73+ score bar).
-            Yield drops as your database grows — re-running the same hashtags finds fewer new faces.
-          </p>
-          {!ugcMode && maxFollowers > 0 && maxFollowers < 20000 && (
-            <p className="band-tip">
-              Small-creator band active — good, they reply most. Note hashtag top-posts skew big
-              (only ~25–30% of a typical scrape is under 15k), so the discards are the big accounts,
-              working as intended. To keep yield up: long-tail hashtags (Nano preset or ✨ suggestions),
-              search terms, and a higher videos-per-source to dig past the viral top posts.
-            </p>
-          )}
-          {!ugcMode && offIcpShare(parsedHashtags) > 0.5 && (
-            <p className="off-icp-warn">
-              ⚠ Most of these hashtags don&apos;t obviously point at Anara&apos;s audiences (study, students,
-              lifestyle, tech, career) or on-camera creators — the forecast may not hold. Very generic tags
-              tend to surface faceless meme/edit accounts that score low.
-            </p>
-          )}
+          <div className="launch-row">
+            <span className="soft" style={{ fontSize: 13 }}>
+              scrape cost ~${ttCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
+            </span>
+            <button className="primary" onClick={() => launchCreator("TikTok")} disabled={launching || !cCountries.length}>
+              {launching ? "Launching…" : "Launch TikTok run"}
+            </button>
+          </div>
         </div>
 
-        <div className="launch-row">
-          <span className="soft" style={{ fontSize: 13 }}>
-            scrape cost ~${estCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
-          </span>
-          <button className="primary" onClick={launch} disabled={launching || (!parsedHashtags.length && !parsedSearchTerms.length)}>
-            {launching ? "Launching…" : "Launch run"}
-          </button>
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
+          <div className="eyebrow">HUNT UGC FREELANCERS ON LINKEDIN</div>
+          <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
+            Searches people whose LinkedIn job title is UGC / Content Creator in your countries — freelancers
+            who list their trade and reply. Each run walks fresh profiles (see below), so re-run it weekly.
+          </p>
+          <div className="fields">
+            <label className="field">
+              <span>Max profiles</span>
+              <input className="input" type="number" value={cMaxLi} onChange={(e) => setCMaxLi(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Score bar (60–85)</span>
+              <input className="input" type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+            </label>
+          </div>
+          {status?.liCursor?.startPage > 1 && (
+            <p className="soft" style={{ fontSize: 12, margin: "0 0 8px" }}>
+              Continuing from page {status.liCursor.startPage} — each run walks fresh profiles.
+            </p>
+          )}
+          <div className="launch-row">
+            <span className="soft" style={{ fontSize: 13 }}>
+              scrape cost ~${liCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
+            </span>
+            <button className="primary" onClick={() => launchCreator("LinkedIn")} disabled={launching || !cCountries.length}>
+              {launching ? "Launching…" : "Launch LinkedIn run"}
+            </button>
+          </div>
         </div>
-      </div>
+      </>
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
@@ -598,10 +404,12 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
                 <span className="run-tags" title={(r.roles?.length ? r.roles : r.hashtags).join(", ")}>
                   {r.roles?.length
                     ? r.roles.slice(0, 2).join(", ") + (r.roles.length > 2 ? ` +${r.roles.length - 2}` : "")
-                    : r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "—"}
+                    : r.runPlatform === "LinkedIn"
+                      ? `UGC · LinkedIn${r.countries?.length ? " · " + r.countries.map((c) => CC_SHORT[c] || c).join(", ") : ""}`
+                      : r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "UGC · TikTok"}
                 </span>
                 <span className="mono soft run-nums">
-                  {r.videos != null ? `${r.videos} ${r.roles?.length ? "profiles" : "videos"}` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
+                  {r.videos != null ? `${r.videos} ${r.runPlatform === "LinkedIn" ? "profiles" : "videos"}` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
                 </span>
                 <button className="ghost tiny" title={archived[r.id] ? "Unarchive" : "Archive"} aria-label={archived[r.id] ? "Unarchive run" : "Archive run"} onClick={() => toggleArchived(r.id)}>
                   {archived[r.id] ? <IconUndo width={13} height={13} /> : <IconX width={13} height={13} />}

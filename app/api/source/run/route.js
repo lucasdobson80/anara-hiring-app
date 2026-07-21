@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { hasApifyToken, startRun, startResearcherRun, setRunRecord } from "@/lib/apify";
+import {
+  hasApifyToken, startRun, startResearcherRun, startUgcLinkedInRun, setRunRecord,
+  UGC_POOL, sampleUgcTags, getSetting, setSetting, COUNTRY_CODE,
+} from "@/lib/apify";
 import { currentUser } from "@/lib/auth";
 
 const clamp = (v, lo, hi, dflt) => Math.min(Math.max(parseInt(v, 10) || dflt, lo), hi);
@@ -38,26 +41,44 @@ export async function POST(request) {
     }
   }
 
-  const hashtags = (body.hashtags || []).map((h) => String(h).replace(/^#/, "").trim()).filter(Boolean);
-  const searchQueries = (body.searchQueries || []).map((q) => String(q).trim()).filter(Boolean).slice(0, 6);
-  const resultsPerPage = clamp(body.resultsPerPage, 1, 200, 60);
-  const days = clamp(body.days, 1, 365, 30);
-  const maxItems = clamp(body.maxItems, 10, 1500, 500);
-  const minFollowers = clamp(body.minFollowers, 0, 10_000_000, 500);
-  const maxFollowers = clamp(body.maxFollowers, minFollowers, 10_000_000, 15000);
+  // ── Creator track: UGC-freelancer hunt (TikTok + LinkedIn) ──
+  const countries = (body.countries || []).map((c) => String(c).trim()).filter((c) => COUNTRY_CODE[c]).slice(0, 4);
   const threshold = clamp(body.threshold, 60, 85, 70);
-  const ugcMode = Boolean(body.ugcMode);
-  if (!hashtags.length && !searchQueries.length) {
-    return NextResponse.json({ error: "bad-request", message: "At least one hashtag or search term is required." }, { status: 400 });
-  }
   const owner = await currentUser();
+  if (!countries.length) {
+    return NextResponse.json({ error: "bad-request", message: "Pick at least one country." }, { status: 400 });
+  }
+  const countryCodes = countries.map((c) => COUNTRY_CODE[c]);
+
+  // LinkedIn UGC freelancers (job-title search, cursor-paginated for weekly re-runs)
+  if (body.platform === "LinkedIn") {
+    const maxItems = clamp(body.maxItems, 5, 1000, 100);
+    try {
+      const run = await startUgcLinkedInRun({ countries, maxItems });
+      if (run.defaultKeyValueStoreId) {
+        await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
+          track: "creator", platform: "LinkedIn", countries, threshold, owner,
+        }).catch(() => {});
+      }
+      return NextResponse.json({ id: run.id, status: run.status });
+    } catch (e) {
+      return NextResponse.json({ error: "apify", message: e.message }, { status: 502 });
+    }
+  }
+
+  // TikTok UGC hashtag scrape. Fixed pool, sample 8 (avoiding last run's set),
+  // proxy-biased to a random selected country. Follower band is dead (ugcOnly).
+  const maxItems = clamp(body.maxItems, 10, 1500, 500);
   try {
-    const run = await startRun({ hashtags, searchQueries, resultsPerPage, days, maxItems });
-    // Persist the run's own import settings + owner next to it, so import (auto
-    // or manual, any device) applies exactly what this run was launched with.
+    const last = (await getSetting("TT_UGC_LAST_TAGS")) || {};
+    const hashtags = sampleUgcTags(last.tags || [], 8);
+    const resultsPerPage = Math.min(100, Math.ceil(maxItems / hashtags.length));
+    const proxyCountryCode = countryCodes[Math.floor(Math.random() * countryCodes.length)];
+    const run = await startRun({ hashtags, resultsPerPage, days: 30, maxItems, proxyCountryCode });
+    await setSetting("TT_UGC_LAST_TAGS", { tags: hashtags, at: Date.now() });
     if (run.defaultKeyValueStoreId) {
       await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
-        days, minFollowers, maxFollowers, threshold, owner, ugcMode,
+        track: "creator", ugcOnly: true, countries, threshold, owner, days: 30,
       }).catch(() => {});
     }
     return NextResponse.json({ id: run.id, status: run.status });

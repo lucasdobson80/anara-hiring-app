@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasApifyToken, getSpend, listAllRuns, getRunInput, getDatasetInfo, getRunRecord, EST_USD_PER_RESULT } from "@/lib/apify";
+import { hasApifyToken, getSpend, listAllRuns, getRunInput, getDatasetInfo, getRunRecord, getSetting, EST_USD_PER_RESULT } from "@/lib/apify";
 import { hasAnthropicKey } from "@/lib/scoring";
 import { currentUser } from "@/lib/auth";
 
@@ -18,7 +18,10 @@ export async function GET(request) {
     return NextResponse.json({ ready, spend: null, runs: [], estPerResult: EST_USD_PER_RESULT, user });
   }
   try {
-    const [spend, rawRuns] = await Promise.all([getSpend(), listAllRuns(20)]);
+    const [spend, rawRuns, liCursor] = await Promise.all([
+      getSpend(), listAllRuns(20),
+      track === "creator" ? getSetting("LI_UGC_CURSOR").catch(() => null) : Promise.resolve(null),
+    ]);
     let runs = await Promise.all(
       rawRuns.map(async (r) => {
         const [input, dataset, importRecord, config] = await Promise.all([
@@ -30,6 +33,7 @@ export async function GET(request) {
         return {
           runOwner: config?.owner || "lucas",
           runTrack: config?.track || "creator",
+          runPlatform: config?.platform || (config?.track === "researcher" ? "LinkedIn" : "TikTok"),
           id: r.id,
           status: r.status,
           startedAt: r.startedAt,
@@ -38,6 +42,7 @@ export async function GET(request) {
           datasetId: r.defaultDatasetId ?? null,
           hashtags: input?.hashtags || [],
           roles: config?.roles || [],
+          countries: config?.countries || [],
           videos: dataset?.itemCount ?? null,
           // Server-side import state: shared across devices, unlike localStorage
           importResult: importRecord ? { done: importRecord.done, at: importRecord.at, progress: importRecord.progress || null, summary: importRecord.summary } : null,
@@ -49,7 +54,7 @@ export async function GET(request) {
     // When a track is given, only that track's runs (the shell watcher passes
     // none, so it still sees every launched run to import).
     if (track) runs = runs.filter((r) => r.runTrack === track);
-    return NextResponse.json({ ready, spend, estPerResult: EST_USD_PER_RESULT, runs, user, scope });
+    return NextResponse.json({ ready, spend, estPerResult: EST_USD_PER_RESULT, runs, user, scope, liCursor });
   } catch (e) {
     return NextResponse.json({ error: "apify", message: e.message }, { status: 502 });
   }

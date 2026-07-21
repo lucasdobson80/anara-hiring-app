@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  hasApifyToken, getRun, getDatasetItems, aggregateCandidates, aggregateResearchers, getRunRecord, setRunRecord,
+  hasApifyToken, getRun, getDatasetItems, aggregateCandidates, aggregateResearchers,
+  aggregateUgcLinkedIn, getRunRecord, setRunRecord, setSetting, COUNTRY_CODE,
 } from "@/lib/apify";
 import { hasAnthropicKey, scoreCandidates } from "@/lib/scoring";
 import { fetchAllCreators, createCreator, handleExists, normHandle } from "@/lib/notion";
@@ -95,17 +96,34 @@ export async function POST(request) {
     // fallback for runs launched before this existed or outside the app.
     const config = (await getRunRecord(kvId, CONFIG_KEY).catch(() => null)) || {};
     const track = config.track === "researcher" ? "researcher" : "creator";
+    const isUgcLinkedIn = track === "creator" && config.platform === "LinkedIn";
     const days = config.days || body.days || 30;
     const minFollowers = config.minFollowers ?? 1000;
     const maxFollowers = config.maxFollowers ?? 150000;
+    const ugcOnly = Boolean(config.ugcOnly);
     const threshold = Math.min(Math.max(config.threshold || body.threshold || 70, 60), 85);
-    const ugcMode = Boolean(config.ugcMode || body.ugcMode);
-    const platform = track === "researcher" ? "LinkedIn" : "TikTok";
+    // LinkedIn = researcher track OR creator UGC-LinkedIn; else TikTok
+    const platform = track === "researcher" || isUgcLinkedIn ? "LinkedIn" : "TikTok";
+    const countries = config.countries || [];
+    const countryCodes = countries.map((c) => COUNTRY_CODE[c]).filter(Boolean);
 
     const items = await getDatasetItems(run.defaultDatasetId);
-    const { candidates, filtered, uniqueCreators } = track === "researcher"
-      ? (() => { const r = aggregateResearchers(items); return { candidates: r.candidates, filtered: r.filtered, uniqueCreators: r.uniqueProfiles }; })()
-      : aggregateCandidates(items, { days, minFollowers, maxFollowers });
+    let candidates, filtered, uniqueCreators;
+    if (track === "researcher") {
+      const r = aggregateResearchers(items);
+      ({ candidates, filtered } = r); uniqueCreators = r.uniqueProfiles;
+    } else if (isUgcLinkedIn) {
+      const r = aggregateUgcLinkedIn(items, countryCodes);
+      ({ candidates, filtered } = r); uniqueCreators = r.uniqueProfiles;
+      // Pool walked to the end → loop the pagination cursor back to page 1
+      if (items.length === 0) await setSetting("LI_UGC_CURSOR", { startPage: 1, at: Date.now() });
+    } else {
+      // UGC-only creator runs kill the follower band; legacy runs keep theirs
+      const r = aggregateCandidates(items, ugcOnly
+        ? { days, minFollowers: 0, maxFollowers: 10_000_000 }
+        : { days, minFollowers, maxFollowers });
+      ({ candidates, filtered, uniqueCreators } = r);
+    }
 
     // Dedupe by canonical handle against existing same-platform rows across
     // ALL tracks (a LinkedIn person bookmarked in either track is the same
@@ -153,7 +171,11 @@ export async function POST(request) {
       const chunk = batch.slice(i, i + CHUNK);
       let results;
       try {
-        ({ results } = await scoreCandidates(chunk, threshold, { ugcMode, researcher: track === "researcher" }));
+        ({ results } = await scoreCandidates(chunk, threshold, {
+          researcher: track === "researcher",
+          ugcLinkedIn: isUgcLinkedIn,
+          countries,
+        }));
       } catch (e) {
         chunkErrors.push(e.message);
         continue;
@@ -183,9 +205,15 @@ export async function POST(request) {
           niche = (s.niche || []).slice(0, 3);
           // Store connections in the Followers field (card shows it as "Connections")
           insertCandidate = { ...c, followers: c.connections ?? null, maxViews: null };
+        } else if (isUgcLinkedIn) {
+          // UGC freelancer from LinkedIn — prefix a headline snippet + country
+          const ctx = [(c.headline || "").slice(0, 80), COUNTRY_LABEL[c.countryCode] || c.countryCode].filter(Boolean).join(" · ");
+          rationale = ctx ? `${ctx} — ${rationale}` : rationale;
+          niche = [...new Set(["ugc", ...(s.niche || [])])].slice(0, 4);
+          insertCandidate = { ...c, followers: c.connections ?? null, maxViews: null };
         } else {
-          // Mechanical for-hire signals guarantee the ugc tag even if the model skips it
-          niche = [...new Set([...(s.niche || []), ...(c.ugcSignals?.length >= 2 || c.ugcSignals?.includes("ugc-bio") ? ["ugc"] : [])])];
+          // TikTok/IG UGC — always tag "ugc" (the whole search is UGC-only)
+          niche = [...new Set(["ugc", ...(s.niche || [])])].slice(0, 4);
         }
         try {
           // Last line of defence against a concurrent import that slipped past
