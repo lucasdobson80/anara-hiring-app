@@ -10,7 +10,7 @@ import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
 import MessagesTab from "./messages-tab";
-import { IconX, IconCheck, IconExt } from "./icons";
+import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask } from "./icons";
 
 // =============================================================
 // ANARA CASTING DESK — creator sourcing + onboarding cockpit
@@ -229,26 +229,26 @@ export default function AnaraCastingDesk() {
 
   // Nav + track switcher render in two places (sidebar on desktop, top bar on
   // mobile) — functions so each spot gets its own element instances.
-  const renderNav = () => (
+  const renderNav = ({ icons = false } = {}) => (
     <>
-      <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>HQ</button>
+      <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>{icons && <IconHome />}HQ</button>
       <span className="tab-group">
         <span className="tab-group-label">PIPELINE</span>
-        <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>Organic</button>
-        <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>Onboard</button>
+        <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>{icons && <IconSprout />}Organic</button>
+        <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>{icons && <IconUsers />}Onboard</button>
       </span>
       <span className="tab-group">
         <span className="tab-group-label">FIND</span>
-        <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>Source</button>
-        <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>Review</button>
+        <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>{icons && <IconSearch />}Source</button>
+        <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>{icons && <IconInbox />}Review</button>
       </span>
-      <button className={tab === "messages" ? "tab on" : "tab"} onClick={() => setTab("messages")}>Messages</button>
+      <button className={tab === "messages" ? "tab on" : "tab"} onClick={() => setTab("messages")}>{icons && <IconMail />}Messages</button>
     </>
   );
   const renderTrackSwitch = () => (
     <div className="track-switch">
-      <button className={track === "creator" ? "on" : ""} onClick={() => switchTrack("creator")}>🎬 UGC Creators</button>
-      <button className={track === "researcher" ? "on" : ""} onClick={() => switchTrack("researcher")}>🔬 Researchers</button>
+      <button className={track === "creator" ? "on" : ""} onClick={() => switchTrack("creator")}><IconClapper /> UGC Creators</button>
+      <button className={track === "researcher" ? "on" : ""} onClick={() => switchTrack("researcher")}><IconFlask /> Researchers</button>
     </div>
   );
 
@@ -293,8 +293,15 @@ export default function AnaraCastingDesk() {
 
       <div className="frame">
         <aside className="sidebar">
+          <div className="workspace">
+            <div className="workspace-mark" aria-hidden>A</div>
+            <div>
+              <div className="workspace-name">Anara</div>
+              <div className="workspace-sub">Hiring HQ</div>
+            </div>
+          </div>
           {renderTrackSwitch()}
-          <nav className="side-nav" aria-label="Sections">{renderNav()}</nav>
+          <nav className="side-nav" aria-label="Sections">{renderNav({ icons: true })}</nav>
           <div className="side-funnel">
             <div className="eyebrow">{track === "researcher" ? "RESEARCHER FUNNEL" : "FUNNEL"}</div>
             {displayCounts.filter(({ stage }) => stage !== "Approved" && stage !== "Rejected").map(({ stage, n }) => (
@@ -544,7 +551,7 @@ export default function AnaraCastingDesk() {
                           </div>
                           {stage === "Rejected" ? (
                             <div className="pack">
-                              <div className="eyebrow" style={{ color: "#FF6B5E" }}>QUEUED FOR REMOVAL</div>
+                              <div className="eyebrow" style={{ color: "var(--bad)" }}>QUEUED FOR REMOVAL</div>
                               <p className="soft">
                                 Press Save (top right) to confirm — they&apos;ll leave the pipeline as Rejected,
                                 and the scraper can never re-import them. Changed your mind?
@@ -688,7 +695,7 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
       ))}
       {allDone && (
         s.doneNoted ? (
-          <p className="soft" style={{ color: "#3ECF8E" }}>✓ Fully onboarded — logged to their Notion page. They join the weekly Tuesday meeting after trial week.</p>
+          <p className="soft" style={{ color: "var(--ok)" }}>✓ Fully onboarded — logged to their Notion page. They join the weekly Tuesday meeting after trial week.</p>
         ) : (
           <button className="primary" style={{ marginTop: 4 }} onClick={() => { onOnboarded(); onSign({ ...s, doneNoted: true }); }}>
             ✓ Mark fully onboarded

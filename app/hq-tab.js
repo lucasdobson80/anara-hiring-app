@@ -59,7 +59,6 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
   const goal = data?.goal || 1;
   const signed = data?.signed || 0;
   const pct = Math.min(100, Math.round((signed / goal) * 100));
-  const maxBar = Math.max(1, ...FUNNEL.map(([k]) => f[k] || 0));
   const rel = REL[period]?.[String(offset)];
 
   return (
@@ -84,50 +83,43 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
       {error && <div className="banner bad" style={{ borderRadius: 10, marginBottom: 14 }}>{error}</div>}
 
       {loading && !data ? (
-        <div className="hq-grid">
-          <div className="sk sk-panel" /><div className="sk sk-panel" />
-          <div className="sk sk-panel" /><div className="sk sk-panel" />
+        <div className="kpi-row">
+          <div className="sk sk-bar" /><div className="sk sk-bar" />
+          <div className="sk sk-bar" /><div className="sk sk-bar" /><div className="sk sk-bar" />
         </div>
       ) : (
-        <div className="hq-grid" style={loading ? { opacity: 0.55 } : undefined}>
-          {/* Researchers have no weekly goal — Laia's track tracks activity only */}
-          {track !== "researcher" && (
-            <div className="card hq-goal">
-              <div className="eyebrow">{scope === "all" ? "TEAM GOAL" : "MY GOAL"} · {(rel || data?.label || "").toUpperCase()}</div>
-              <div className="hq-goal-num">
-                <b className="mono">{signed}</b>
-                <span className="soft">/ {goal} onboarded</span>
-              </div>
-              <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
-              <p className="soft" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
-                {signed >= goal
-                  ? "Goal hit — anything more is gravy. 🎉"
-                  : `${goal - signed} to go${scope === "all" ? ` · ${data?.goalPerPerson} per person` : ""}`}
-              </p>
-            </div>
-          )}
-
-          <div className="card hq-panel">
-            <div className="eyebrow">FUNNEL · {(rel || data?.label || "").toUpperCase()}</div>
-            <div className="hq-funnel">
-              {FUNNEL.map(([k, label]) => (
-                <div key={k} className="hq-frow">
-                  <span className="hq-flabel">{stageLabel(label)}</span>
-                  <div className="hq-fbars"><div className="hq-fbar now" style={{ width: `${((f[k] || 0) / maxBar) * 100}%` }} /></div>
-                  <span className="mono hq-fnums"><b>{f[k] || 0}</b></span>
+        <div style={loading ? { opacity: 0.55 } : undefined}>
+          {/* KPI stat tiles: goal first (accent-ringed), then one per stage */}
+          <div className="kpi-row">
+            {/* Researchers have no goal — Laia's track tracks activity only */}
+            {track !== "researcher" && (
+              <div className="kpi goal">
+                <div className="kpi-label">{scope === "all" ? "Team goal" : "My goal"} · {rel || data?.label || ""}</div>
+                <div className="kpi-num">{signed} <span className="kpi-sub">/ {goal} onboarded</span></div>
+                <div className="hq-goal-track"><div className="hq-goal-fill" style={{ width: `${pct}%` }} /></div>
+                <div className="kpi-note">
+                  {signed >= goal
+                    ? "Goal hit — anything more is gravy 🎉"
+                    : `${goal - signed} to go${scope === "all" ? ` · ${data?.goalPerPerson} per person` : ""}`}
                 </div>
-              ))}
-            </div>
-            <p className="soft" style={{ fontSize: 11.5, margin: "10px 0 0" }}>counted from status changes saved in the app</p>
+              </div>
+            )}
+            {FUNNEL.map(([k, label]) => (
+              <div key={k} className="kpi">
+                <div className="kpi-label">{stageLabel(label)}</div>
+                <div className="kpi-num">{f[k] || 0}</div>
+              </div>
+            ))}
           </div>
+          <p className="hint" style={{ marginTop: 10 }}>counted from status changes saved in the app · {rel || data?.label || ""}</p>
 
           {scope === "all" && (
-            <div className="card hq-panel" style={{ gridColumn: "1 / -1" }}>
-              <div className="eyebrow">BY TEAM MEMBER · {(rel || data?.label || "").toUpperCase()}</div>
+            <div className="card hq-panel" style={{ marginTop: 16 }}>
+              <div className="eyebrow">By team member · {rel || data?.label || ""}</div>
               <div className="hq-acct-scroll">
                 <div className="hq-acct hq-acct-head">
                   <span></span>
-                  {FUNNEL.map(([k, label]) => <span key={k} className="mono">{stageLabel(label).toLowerCase()}</span>)}
+                  {FUNNEL.map(([k, label]) => <span key={k} style={{ textAlign: "right" }}>{stageLabel(label)}</span>)}
                 </div>
                 {team.map((m) => (
                   <div key={m} className={"hq-acct" + (m === me ? " me" : "")}>
