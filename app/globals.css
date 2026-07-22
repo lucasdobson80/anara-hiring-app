@@ -55,8 +55,6 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
    (capped only on ultrawide monitors so lines stay sane). */
 .frame { display: grid; grid-template-columns: 210px 1fr; gap: 26px; padding: 24px 26px; }
 .frame > main { max-width: 1400px; }
-.frame.noside { grid-template-columns: 1fr; }
-.frame.noside .sidebar { display: none; }
 .hint { font-size: 12px; line-height: 1.55; color: var(--faint); margin-top: 14px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 22px 24px 8px; flex-wrap: wrap; }
@@ -217,21 +215,40 @@ select.input { appearance: none; }
 .kpi-btn:hover:not(.sel) { border-color: var(--border-2); }
 .kpi-btn.sel { border-color: var(--accent-border); box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-1); }
 
-/* Hero trend chart */
+/* Hero trend chart — its own look: thinner line, visible data points,
+   dashed grid, crosshair tooltip (not a Shortimize clone) */
 .hq-chart { margin-top: 16px; padding: 18px 20px 12px; }
 .hq-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .trend-wrap { position: relative; }
-.trend { display: block; width: 100%; height: auto; }
-.trend-line { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.trend-grid { stroke: #EDEFF3; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.trend { display: block; width: 100%; height: auto; cursor: crosshair; }
+.trend-line { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.trend-grid { stroke: #E9EBF0; stroke-width: 1; stroke-dasharray: 3 5; vector-effect: non-scaling-stroke; }
 .trend-ylabel, .trend-xlabel { font-size: 11px; fill: var(--faint); font-family: 'Spline Sans Mono', monospace; }
-.trend-dot-hit { fill: transparent; }
-.trend-dot-hit:hover { fill: var(--accent); fill-opacity: .25; }
+.trend-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; transition: r .1s var(--ease); }
+.trend-dot.hot { fill: var(--accent); }
+.trend-cross { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 2 4; opacity: .55; vector-effect: non-scaling-stroke; }
+.trend-tip { position: absolute; transform: translate(-50%, calc(-100% - 14px)); background: var(--text); color: #fff; border-radius: 8px; padding: 7px 11px; font-size: 12px; line-height: 1.45; pointer-events: none; white-space: nowrap; box-shadow: var(--shadow-lift); z-index: 5; }
+.trend-tip-date { color: rgba(255,255,255,.65); font-size: 11px; }
+.trend-tip-val b { font-size: 14px; font-family: 'Spline Sans Mono', monospace; }
 .trend-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; pointer-events: none; }
 
 /* Sidebar collapse toggle (desktop only — mobile has no sidebar) */
 .side-toggle { padding: 7px 9px; display: inline-flex; align-items: center; color: var(--soft); }
 @media (max-width: 900px) { .side-toggle { display: none; } }
+
+/* ── Collapsed sidebar = icon rail (Shortimize-style): icons stay,
+   labels/funnel/hint hide, everything centered in a 64px column ── */
+.frame.noside { grid-template-columns: 64px 1fr; }
+.frame.noside .sidebar { display: flex; }
+.frame.noside .nav-label, .frame.noside .tab-group-label,
+.frame.noside .workspace-text, .frame.noside .workspace .signed-in,
+.frame.noside .side-funnel, .frame.noside .sidebar .hint { display: none; }
+.frame.noside .workspace { justify-content: center; padding: 2px 0; }
+.frame.noside .track-switch { background: none; padding: 0; gap: 4px; }
+.frame.noside .track-switch button { justify-content: center; padding: 8px 0; }
+.frame.noside .track-switch button.on { background: var(--surface-2); box-shadow: none; }
+.frame.noside .side-nav .tab { justify-content: center; padding: 9px 0; gap: 0; }
+.frame.noside .side-nav .tab-group { padding: 8px 0 0; }
 
 /* Floating toast (still used by manual flows) */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; width: max-content; max-width: min(92vw, 680px); border-radius: 10px; box-shadow: var(--shadow-lift); display: flex; align-items: center; gap: 14px; border: 1px solid var(--ok-border); }
@@ -355,8 +372,10 @@ select.input { appearance: none; }
 
 .workspace { display: flex; align-items: center; gap: 10px; padding: 2px 4px; }
 .workspace-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--text); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+.workspace-text { flex: 1; min-width: 0; }
 .workspace-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
 .workspace-sub { font-size: 11.5px; color: var(--faint); }
+.workspace .signed-in { align-self: center; text-transform: capitalize; letter-spacing: 0.02em; }
 
 .track-switch { display: flex; flex-direction: column; gap: 2px; background: var(--surface-2); border-radius: 9px; padding: 3px; }
 .track-switch button { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--soft); font-family: inherit; font-weight: 600; font-size: 13px; text-align: left; padding: 7px 10px; border-radius: 7px; cursor: pointer; }
@@ -386,7 +405,9 @@ select.input { appearance: none; }
   .frame { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .mobile-nav { display: flex; flex-direction: column; gap: 10px; padding: 12px 26px; border-bottom: 1px solid var(--border); background: var(--surface); }
-  .mobile-nav .track-switch { flex-direction: row; }
+  .mobile-nav .mobile-id { display: flex; align-items: center; gap: 10px; }
+  .mobile-nav .track-switch { flex-direction: row; flex: 1; }
   .mobile-nav .track-switch button { flex: 1; text-align: center; justify-content: center; }
+  .mobile-nav .signed-in { text-transform: capitalize; }
 }
 @media (max-width: 480px) { .mobile-nav { padding: 10px 14px; } }

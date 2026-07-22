@@ -22,26 +22,33 @@ const REL = {
   month: { 0: "This month", "-1": "Last month" },
 };
 
-// ── Hero area chart: smooth indigo line + soft fill, y labels right ──
+// ── Hero area chart: smooth indigo line, visible data points, dashed
+// grid, and an interactive crosshair tooltip. Deliberately its own look
+// (dots + dashed grid) rather than a Shortimize clone.
 function TrendChart({ series, metric, label }) {
-  const W = 860, H = 240, PADL = 10, PADR = 46, PADT = 14, PADB = 26;
+  const W = 860, H = 250, PADL = 12, PADR = 46, PADT = 26, PADB = 28;
+  const [hover, setHover] = useState(null); // point index or null
+  const svgRef = useRef(null);
   const vals = series.map((p) => p[metric] || 0);
   const max = Math.max(1, ...vals);
-  // Nice y ceiling so gridlines land on round numbers
+  // Nice y ceiling so gridlines land on round numbers, plus headroom so
+  // the curve never kisses the card edge.
   const step = max <= 4 ? 1 : max <= 8 ? 2 : max <= 20 ? 5 : max <= 40 ? 10 : Math.ceil(max / 4 / 10) * 10;
   const top = Math.max(step, Math.ceil(max / step) * step);
   const x = (i) => PADL + (i / Math.max(1, series.length - 1)) * (W - PADL - PADR);
   const y = (v) => PADT + (1 - v / top) * (H - PADT - PADB);
 
-  // Catmull-Rom → cubic bezier for the Shortimize-style smooth curve
+  // Catmull-Rom → cubic bezier, with control-point y clamped to each
+  // segment's own range so the curve can't overshoot past a peak.
   const path = useMemo(() => {
     if (series.length < 2) return "";
     const pts = vals.map((v, i) => [x(i), y(v)]);
+    const clampY = (cy, a, b) => Math.max(Math.min(a, b), Math.min(Math.max(a, b), cy));
     let d = `M ${pts[0][0]} ${pts[0][1]}`;
     for (let i = 0; i < pts.length - 1; i++) {
       const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
-      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, clampY(p1[1] + (p2[1] - p0[1]) / 6, p1[1], p2[1])];
+      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, clampY(p2[1] - (p3[1] - p1[1]) / 6, p1[1], p2[1])];
       d += ` C ${c1[0]} ${c1[1]}, ${c2[0]} ${c2[1]}, ${p2[0]} ${p2[1]}`;
     }
     return d;
@@ -52,16 +59,34 @@ function TrendChart({ series, metric, label }) {
   const gridVals = [];
   for (let v = step; v <= top; v += step) gridVals.push(v);
   const fmtDay = (d) => `${d.slice(5, 7)}/${d.slice(8, 10)}`;
+  const fmtLong = (d) => {
+    const dt = new Date(d + "T00:00:00Z");
+    return dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  };
   // Up to ~6 x labels, always first + last
   const every = Math.max(1, Math.ceil(series.length / 6));
   const flat = vals.every((v) => v === 0);
 
+  // Crosshair: track the pointer in SVG space, snap to the nearest day
+  const onMove = (e) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const px = ((e.clientX - rect.left) / rect.width) * W;
+    const i = Math.round(((px - PADL) / (W - PADL - PADR)) * (series.length - 1));
+    setHover(Math.max(0, Math.min(series.length - 1, i)));
+  };
+  const hoverPt = hover != null ? { x: x(hover), y: y(vals[hover]) } : null;
+
   return (
     <div className="trend-wrap">
-      <svg className="trend" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Daily ${label} trend`}>
+      <svg
+        ref={svgRef} className="trend" viewBox={`0 0 ${W} ${H}`}
+        role="img" aria-label={`Daily ${label} trend`}
+        onMouseMove={onMove} onMouseLeave={() => setHover(null)}
+      >
         <defs>
           <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6E7BFF" stopOpacity="0.16" />
+            <stop offset="0%" stopColor="#6E7BFF" stopOpacity="0.10" />
             <stop offset="100%" stopColor="#6E7BFF" stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -73,11 +98,11 @@ function TrendChart({ series, metric, label }) {
         ))}
         {path && <path d={`${path} L ${x(series.length - 1)} ${y(0)} L ${x(0)} ${y(0)} Z`} fill="url(#trend-fill)" stroke="none" />}
         {path && <path d={path} className="trend-line" fill="none" />}
+        {/* Visible data points — part of what keeps this from being a Shortimize clone */}
         {vals.map((v, i) => (
-          <circle key={i} cx={x(i)} cy={y(v)} r="9" className="trend-dot-hit">
-            <title>{`${fmtDay(series[i].date)} — ${v} ${label.toLowerCase()}`}</title>
-          </circle>
+          <circle key={i} cx={x(i)} cy={y(v)} r={hover === i ? 5 : 3} className={"trend-dot" + (hover === i ? " hot" : "")} />
         ))}
+        {hoverPt && <line x1={hoverPt.x} x2={hoverPt.x} y1={PADT - 6} y2={H - PADB} className="trend-cross" />}
         {series.map((p, i) => (
           (i % every === 0 || i === series.length - 1) && (
             <text key={p.date} x={x(i)} y={H - 6} className="trend-xlabel" textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"}>
@@ -86,6 +111,15 @@ function TrendChart({ series, metric, label }) {
           )
         ))}
       </svg>
+      {hover != null && (
+        <div
+          className="trend-tip"
+          style={{ left: `${(x(hover) / W) * 100}%`, top: `${(y(vals[hover]) / H) * 100}%` }}
+        >
+          <div className="trend-tip-date">{fmtLong(series[hover].date)}</div>
+          <div className="trend-tip-val"><b>{vals[hover]}</b> {label.toLowerCase()}</div>
+        </div>
+      )}
       {flat && <div className="trend-empty soft">No {label.toLowerCase()} activity in this window yet.</div>}
     </div>
   );

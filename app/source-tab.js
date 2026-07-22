@@ -49,7 +49,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   const [cCountries, setCCountries] = useState(["United States", "United Kingdom"]);
   const [cMaxTt, setCMaxTt] = useState(500);
   const [cMaxLi, setCMaxLi] = useState(100);
-  const [threshold, setThreshold] = useState(73);
+  const [threshold, setThreshold] = useState(70);
   const [launching, setLaunching] = useState(false);
   const [importing, setImporting] = useState(null); // runId
   const [importResult, setImportResult] = useState(null);
@@ -334,7 +334,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
             </label>
           </div>
           {status?.liCursor?.startPage > 1 && (
-            <p className="soft" style={{ fontSize: 12, margin: "0 0 8px" }}>
+            <p className="soft" style={{ fontSize: 12, margin: "10px 0 4px" }}>
               Continuing from page {status.liCursor.startPage} — each run walks fresh profiles.
             </p>
           )}
@@ -464,8 +464,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       )}
       <p className="hint">
         When a scrape finishes, hit <b>Import &amp; score</b> on its run card. Candidates are filtered, scored,
-        deduped, and anyone at 73+ lands in Review; everyone below the bar is recorded as &quot;Screened&quot; in
-        Notion, so no creator is ever scored twice. The ✕ on a run card archives it from this list.
+        deduped, and anyone clearing your score bar lands in Review; everyone below it is recorded as
+        &quot;Screened&quot; in Notion, so no creator is ever scored twice. The ✕ on a run card archives it from this list.
       </p>
     </div>
   );

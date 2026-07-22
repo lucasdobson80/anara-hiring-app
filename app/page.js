@@ -244,26 +244,28 @@ export default function AnaraCastingDesk() {
 
   // Nav + track switcher render in two places (sidebar on desktop, top bar on
   // mobile) — functions so each spot gets its own element instances.
+  // Labels sit in .nav-label spans so the mini (icon-rail) sidebar can hide
+  // them; title attributes become the tooltip when collapsed.
   const renderNav = ({ icons = false } = {}) => (
     <>
-      <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>{icons && <IconHome />}Overview</button>
+      <button className={tab === "hq" ? "tab on" : "tab"} title="Overview" onClick={() => setTab("hq")}>{icons && <IconHome />}<span className="nav-label">Overview</span></button>
       <span className="tab-group">
         <span className="tab-group-label">PIPELINE</span>
-        <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>{icons && <IconSprout />}Organic</button>
-        <button className={tab === "onboard" ? "tab on" : "tab"} onClick={() => setTab("onboard")}>{icons && <IconUsers />}Onboard</button>
+        <button className={tab === "organic" ? "tab on" : "tab"} title="Organic" onClick={() => setTab("organic")}>{icons && <IconSprout />}<span className="nav-label">Organic</span></button>
+        <button className={tab === "onboard" ? "tab on" : "tab"} title="Onboard" onClick={() => setTab("onboard")}>{icons && <IconUsers />}<span className="nav-label">Onboard</span></button>
       </span>
       <span className="tab-group">
         <span className="tab-group-label">FIND</span>
-        <button className={tab === "source" ? "tab on" : "tab"} onClick={() => setTab("source")}>{icons && <IconSearch />}Source</button>
-        <button className={tab === "review" ? "tab on" : "tab"} onClick={() => setTab("review")}>{icons && <IconInbox />}Review</button>
+        <button className={tab === "source" ? "tab on" : "tab"} title="Source" onClick={() => setTab("source")}>{icons && <IconSearch />}<span className="nav-label">Source</span></button>
+        <button className={tab === "review" ? "tab on" : "tab"} title="Review" onClick={() => setTab("review")}>{icons && <IconInbox />}<span className="nav-label">Review</span></button>
       </span>
-      <button className={tab === "messages" ? "tab on" : "tab"} onClick={() => setTab("messages")}>{icons && <IconMail />}Messages</button>
+      <button className={tab === "messages" ? "tab on" : "tab"} title="Messages" onClick={() => setTab("messages")}>{icons && <IconMail />}<span className="nav-label">Messages</span></button>
     </>
   );
   const renderTrackSwitch = () => (
     <div className="track-switch">
-      <button className={track === "creator" ? "on" : ""} onClick={() => switchTrack("creator")}><IconClapper /> UGC Creators</button>
-      <button className={track === "researcher" ? "on" : ""} onClick={() => switchTrack("researcher")}><IconFlask /> Researchers</button>
+      <button className={track === "creator" ? "on" : ""} title="UGC Creators" onClick={() => switchTrack("creator")}><IconClapper /> <span className="nav-label">UGC Creators</span></button>
+      <button className={track === "researcher" ? "on" : ""} title="Researchers" onClick={() => switchTrack("researcher")}><IconFlask /> <span className="nav-label">Researchers</span></button>
     </div>
   );
 
@@ -291,7 +293,6 @@ export default function AnaraCastingDesk() {
           <h1>{TAB_TITLES[tab] || "Overview"}</h1>
         </div>
         <div className="top-actions">
-          {user && <span className="signed-in" title="Signed in">{user}</span>}
           <button className="ghost" onClick={() => load({ keepPending: pendingCount > 0 })} disabled={loading || syncing}>Reload</button>
           <button className="primary" onClick={sync} disabled={!pendingCount || syncing}>
             {syncing ? "Saving…" : pendingCount ? `Save ${pendingCount} to Notion` : "Nothing to save"}
@@ -301,7 +302,10 @@ export default function AnaraCastingDesk() {
 
       {/* Mobile-only nav (sidebar hides ≤900px): track switch + tabs */}
       <div className="mobile-nav">
-        {renderTrackSwitch()}
+        <div className="mobile-id">
+          {renderTrackSwitch()}
+          {user && <span className="signed-in" title="Signed in">{user}</span>}
+        </div>
         <nav className="tabs" aria-label="Sections">{renderNav()}</nav>
       </div>
 
@@ -311,10 +315,11 @@ export default function AnaraCastingDesk() {
         <aside className="sidebar">
           <div className="workspace">
             <div className="workspace-mark" aria-hidden>A</div>
-            <div>
+            <div className="workspace-text">
               <div className="workspace-name">Anara</div>
               <div className="workspace-sub">Hiring HQ</div>
             </div>
+            {user && <span className="signed-in" title="Signed in">{user}</span>}
           </div>
           {renderTrackSwitch()}
           <nav className="side-nav" aria-label="Sections">{renderNav({ icons: true })}</nav>
