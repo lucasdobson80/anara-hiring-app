@@ -345,6 +345,15 @@ select.input { appearance: none; }
 .sp-line.done { background: var(--accent); }
 @media (max-width: 600px) { .stage-progress { flex-wrap: wrap; gap: 6px 0; } }
 
+/* Playbook meta: the creator's numbers + tags fill the card usefully */
+.play-meta { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.pm-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; min-width: 104px; }
+.pm-tile b { font-size: 17px; font-weight: 600; }
+.pm-tile label { display: block; font-size: 10.5px; font-weight: 600; color: var(--faint); margin-top: 2px; }
+.play-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 16px; }
+.pm-email { cursor: pointer; color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); font-family: inherit; }
+.pm-email:hover { border-color: var(--accent); }
+
 /* Roster row: let the name truncate so the badges never overflow the row */
 .rname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roster-tags { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }

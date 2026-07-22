@@ -611,6 +611,8 @@ export default function AnaraCastingDesk() {
                       const PlatformIcon = PLATFORM_ICONS[platform] || IconTikTok;
                       // The stepper IS the stage control — click a step to move them
                       const spIdx = ONBOARD_STAGES.indexOf(stage);
+                      const shortDate = (iso) => { try { return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" }); } catch { return null; } };
+                      const niches = (c.niche || []).filter((n) => n !== "ugc");
                       return (
                         <div>
                           <div className="play-head">
@@ -642,6 +644,24 @@ export default function AnaraCastingDesk() {
                                   </button>
                                 </span>
                               ))}
+                            </div>
+                          )}
+                          {(c.followers != null || c.score != null || c.dateSourced) && (
+                            <div className="play-meta">
+                              {c.followers != null && <div className="pm-tile"><b className="mono">{fmt(c.followers)}</b><label>{platform === "LinkedIn" ? "Connections" : "Followers"}</label></div>}
+                              {platform !== "LinkedIn" && c.views != null && <div className="pm-tile"><b className="mono">{fmt(c.views)}</b><label>Sourced video views</label></div>}
+                              {c.score != null && <div className="pm-tile"><b className="mono">{c.score}</b><label>Fit score</label></div>}
+                              {c.dateSourced && <div className="pm-tile"><b className="mono">{shortDate(c.dateSourced)}</b><label>Sourced</label></div>}
+                            </div>
+                          )}
+                          {(c.email || niches.length > 0) && (
+                            <div className="play-tags">
+                              {c.email && (
+                                <button className="niche-chip pm-email" title="Copy email" onClick={() => copy("play-email-" + c.id, c.email)}>
+                                  ✉ {copiedKey === "play-email-" + c.id ? "Copied!" : c.email}
+                                </button>
+                              )}
+                              {niches.map((n) => <span key={n} className="niche-chip">{n}</span>)}
                             </div>
                           )}
                           {stage === "Rejected" ? (
