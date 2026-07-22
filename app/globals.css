@@ -242,6 +242,16 @@ select.input { appearance: none; }
 .side-toggle { padding: 7px 9px; display: inline-flex; align-items: center; color: var(--soft); }
 @media (max-width: 900px) { .side-toggle { display: none; } }
 
+/* Track cue: persistent top-bar tag when on the researcher track */
+.track-tag { display: inline-flex; align-items: center; gap: 5px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; }
+
+/* Track switch flash: brief full-screen announcement of the new world */
+@keyframes cd-track-flash { 0% { opacity: 0; } 18% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+.track-flash { position: fixed; inset: 0; z-index: 80; background: rgba(246, 247, 249, 0.94); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; pointer-events: none; animation: cd-track-flash .95s var(--ease) forwards; }
+.track-flash-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text); font-size: 20px; font-weight: 700; }
+.track-flash-inner svg { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .track-flash { animation: none; } }
+
 /* ── Collapsed sidebar: fully hidden, content takes the whole width,
    centered so the gutters match on both sides once the cap kicks in ── */
 .frame.noside { grid-template-columns: 1fr; }

@@ -171,12 +171,19 @@ export default function AnaraCastingDesk() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Full-screen flash on track switch — you can't miss that you changed
+  // worlds, and it masks the moment where the old track's data lingers.
+  const [trackFlash, setTrackFlash] = useState(null);
+  const flashTimerRef = useRef(null);
   const switchTrack = (t) => {
     if (t === track) return;
     setTrack(t);
     try { localStorage.setItem("cd_track", t); } catch {}
     setSelected(null);
     setPending({});
+    setTrackFlash(t);
+    clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setTrackFlash(null), 950);
     // load() refetches automatically (track is a dep of the load callback)
   };
 
@@ -325,6 +332,7 @@ export default function AnaraCastingDesk() {
             <IconPanel />
           </button>
           <h1>{TAB_TITLES[tab] || "Overview"}</h1>
+          {track === "researcher" && <span className="track-tag"><IconFlask width={12} height={12} /> Researchers</span>}
         </div>
         <div className="top-actions">
           <button className="ghost" onClick={() => load({ keepPending: pendingCount > 0 })} disabled={loading || syncing}>Reload</button>
@@ -344,6 +352,14 @@ export default function AnaraCastingDesk() {
       </div>
 
       {syncMsg && <div className={"banner" + (/failed/i.test(syncMsg) ? " bad" : "")}>{syncMsg}</div>}
+      {trackFlash && (
+        <div className="track-flash" role="status" aria-live="polite">
+          <div className="track-flash-inner">
+            {trackFlash === "researcher" ? <IconFlask width={30} height={30} /> : <IconClapper width={30} height={30} />}
+            <span>{trackFlash === "researcher" ? "Researchers" : "UGC Creators"}</span>
+          </div>
+        </div>
+      )}
 
       <div className={"frame" + (sideHidden ? " noside" : "")}>
         <aside className="sidebar">
@@ -528,7 +544,19 @@ export default function AnaraCastingDesk() {
                     onChange={(e) => setOnboardSearch(e.target.value)}
                   />
                   {["All", ...ONBOARD_STAGES].map((s) => (
-                    <button key={s} className={"chip" + (onboardStage === s ? " on" : "")} onClick={() => setOnboardStage(s)}>
+                    <button
+                      key={s} className={"chip" + (onboardStage === s ? " on" : "")}
+                      onClick={() => {
+                        setOnboardStage(s);
+                        // The card must never show someone the filter hides —
+                        // drop the selection unless they belong to the new stage.
+                        setSelected((sel) => {
+                          if (!sel) return sel;
+                          const c = roster.find((r) => r.id === sel);
+                          return c && (s === "All" || stageOf(c) === s) ? sel : null;
+                        });
+                      }}
+                    >
                       {stageLabel(s)}
                     </button>
                   ))}
