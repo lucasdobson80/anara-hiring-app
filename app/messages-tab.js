@@ -130,7 +130,7 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
   return (
     <div className="messages-tab">
       <div className="card" style={{ padding: "18px 22px", marginBottom: 16 }}>
-        <div className="eyebrow">MY MESSAGE BANK ({(user || "me").toUpperCase()})</div>
+        <div className="eyebrow">My message bank ({user || "me"})</div>
         <p className="soft" style={{ fontSize: 13, margin: "8px 0 0", lineHeight: 1.55 }}>
           Your personal outreach &amp; onboarding copy. Write <span className="mono">{"{first}"}</span> wherever
           the creator&apos;s first name should appear (becomes &quot;there&quot; when unknown). These are what the
@@ -142,7 +142,7 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
 
       {MESSAGE_GROUPS.map((g) => (
         <div key={g.label} style={{ marginBottom: 8 }}>
-          <div className="eyebrow" style={{ margin: "6px 2px 10px" }}>{g.label.toUpperCase()}</div>
+          <div className="eyebrow" style={{ margin: "6px 2px 10px" }}>{g.label}</div>
           {g.names.map(card)}
         </div>
       ))}

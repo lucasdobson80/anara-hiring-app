@@ -58,6 +58,27 @@ function periodFunnel(creators, from, to) {
   return out;
 }
 
+// Daily trend for the overview chart: one point per day in [from, to),
+// counting unique creators stamped per stage that day.
+function dailySeries(creators, from, to) {
+  const days = [];
+  for (let d = new Date(from + "T00:00:00Z"); iso(d) < to; d = new Date(d.getTime() + 86400000)) {
+    days.push(iso(d));
+  }
+  const byDay = Object.fromEntries(days.map((d) => [d, Object.fromEntries(FUNNEL.map((s) => [s.toLowerCase(), 0]))]));
+  for (const c of creators) {
+    const seen = new Set();
+    for (const ev of c.stageEvents || []) {
+      const key = `${ev.date}:${ev.status}`;
+      if (byDay[ev.date] && FUNNEL.includes(ev.status) && !seen.has(key)) {
+        byDay[ev.date][ev.status.toLowerCase()] += 1;
+        seen.add(key);
+      }
+    }
+  }
+  return days.map((d) => ({ date: d, ...byDay[d] }));
+}
+
 export async function GET(request) {
   const user = await currentUser();
   const url = new URL(request.url);
@@ -77,6 +98,13 @@ export async function GET(request) {
     const { from, to } = periodBounds(period, offset);
     const funnel = periodFunnel(scoped, from, to);
 
+    // Chart series: daily points across the period. A single day is no
+    // trend — widen to the 14 days ending on the selected day for context.
+    const seriesFrom = period === "day"
+      ? iso(new Date(new Date(from + "T00:00:00Z").getTime() - 13 * 86400000))
+      : from;
+    const series = dailySeries(scoped, seriesFrom, to);
+
     // Per-account rows: every member, every stage (accountability table).
     const perOwner = {};
     for (const m of TEAM) perOwner[m] = periodFunnel(all.filter((c) => c.owner === m), from, to);
@@ -87,7 +115,7 @@ export async function GET(request) {
     return NextResponse.json({
       period, offset, scope, track, user, team: TEAM,
       label: labelFor(period, from), from, to, isCurrent: offset === 0,
-      funnel, perOwner,
+      funnel, perOwner, series,
       goalPerPerson: perPerson, goal, signed: funnel.signed,
     });
   } catch (e) {

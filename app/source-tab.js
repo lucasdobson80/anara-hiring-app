@@ -218,7 +218,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       {status?.spend && (
         <div className="spendbar">
           <div>
-            <div className="eyebrow">APIFY SPEND THIS CYCLE</div>
+            <div className="eyebrow">Apify spend this cycle</div>
             <div className="spend-num mono">
               {fmtUsd(status.spend.monthlyUsageUsd)}
               {status.spend.maxMonthlyUsageUsd != null && (
@@ -232,7 +232,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
 
       {track === "researcher" ? (
         <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
-          <div className="eyebrow">NEW RESEARCHER RUN (LINKEDIN)</div>
+          <div className="eyebrow">New researcher run (LinkedIn)</div>
           <p className="soft" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.55 }}>
             Searches LinkedIn for early-career people in these roles at pharma / biotech / CRO companies in the
             chosen countries. Senior titles, recruiters, and freelancers are filtered out; scoring judges the
@@ -240,14 +240,14 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
           </p>
           {Object.entries(RESEARCHER_ROLE_GROUPS).map(([group, roles]) => (
             <div className="preset-row" key={group}>
-              <span className="eyebrow" style={{ marginRight: 4 }}>{group.toUpperCase()}</span>
+              <span className="eyebrow" style={{ marginRight: 4 }}>{group}</span>
               {roles.map((role) => (
                 <button key={role} className={"chip" + (rRoles.includes(role) ? " on" : "")} onClick={() => toggleIn(setRRoles, rRoles, role)}>{role}</button>
               ))}
             </div>
           ))}
           <div className="preset-row">
-            <span className="eyebrow" style={{ marginRight: 4 }}>COUNTRIES</span>
+            <span className="eyebrow" style={{ marginRight: 4 }}>Countries</span>
             {RESEARCHER_COUNTRIES.map((c) => (
               <button key={c} className={"chip" + (rCountries.includes(c) ? " on" : "")} onClick={() => toggleIn(setRCountries, rCountries, c)}>{c}</button>
             ))}
@@ -280,7 +280,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       ) : (
       <>
         <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
-          <div className="eyebrow">COUNTRIES</div>
+          <div className="eyebrow">Countries</div>
           <p className="soft" style={{ fontSize: 12.5, margin: "6px 0 10px" }}>
             Shared by both searches. Exact on LinkedIn · best-effort on TikTok.
           </p>
@@ -292,7 +292,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
         </div>
 
         <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
-          <div className="eyebrow">HUNT UGC CREATORS ON TIKTOK</div>
+          <div className="eyebrow">Hunt UGC creators on TikTok</div>
           <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
             Scrapes a rotating set of UGC-for-hire hashtags; scoring keeps only dedicated UGC-freelancer
             accounts in your countries. Follower counts are ignored.
@@ -318,7 +318,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
         </div>
 
         <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
-          <div className="eyebrow">HUNT UGC FREELANCERS ON LINKEDIN</div>
+          <div className="eyebrow">Hunt UGC freelancers on LinkedIn</div>
           <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
             Searches people whose LinkedIn job title is UGC / Content Creator in your countries — freelancers
             who list their trade and reply. Each run walks fresh profiles (see below), so re-run it weekly.
@@ -351,7 +351,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <div className="eyebrow">RECENT RUNS</div>
+        <div className="eyebrow">Recent runs</div>
         {Object.keys(archived).length > 0 && (
           <button className="chip" onClick={() => setShowArchived((s) => !s)}>
             {showArchived ? "Hide archived" : `Archived (${Object.keys(archived).length})`}
@@ -442,7 +442,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
           </div>
           {importResult.inserted === 0 && importResult.topMisses?.length > 0 && (
             <div className="misses">
-              <div className="eyebrow">NOTHING CLEARED THE BAR — CLOSEST MISSES</div>
+              <div className="eyebrow">Nothing cleared the bar — closest misses</div>
               {importResult.topMisses.map((m) => (
                 <div key={m.handle} className="miss-row">
                   <span className="mini-stamp mono miss-stamp">{m.score}</span>

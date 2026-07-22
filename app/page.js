@@ -10,7 +10,10 @@ import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
 import MessagesTab from "./messages-tab";
-import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask } from "./icons";
+import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask, IconPanel } from "./icons";
+
+// Top-bar page titles (the wordmark lives in the sidebar workspace block)
+const TAB_TITLES = { hq: "Overview", organic: "Organic", onboard: "Onboard", source: "Source", review: "Review", messages: "Messages" };
 
 // =============================================================
 // ANARA CASTING DESK — creator sourcing + onboarding cockpit
@@ -95,6 +98,18 @@ export default function AnaraCastingDesk() {
   useEffect(() => {
     try { const t = localStorage.getItem("cd_track"); if (t === "researcher" || t === "creator") setTrack(t); } catch {}
   }, []);
+
+  // Collapsible sidebar (persisted per browser)
+  const [sideHidden, setSideHidden] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem("cd_sidebar") === "hidden") setSideHidden(true); } catch {}
+  }, []);
+  const toggleSidebar = () => {
+    setSideHidden((h) => {
+      try { localStorage.setItem("cd_sidebar", h ? "" : "hidden"); } catch {}
+      return !h;
+    });
+  };
   const loadSeq = useRef(0);
   const load = useCallback(async ({ keepPending = false } = {}) => {
     const seq = ++loadSeq.current;
@@ -231,7 +246,7 @@ export default function AnaraCastingDesk() {
   // mobile) — functions so each spot gets its own element instances.
   const renderNav = ({ icons = false } = {}) => (
     <>
-      <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>{icons && <IconHome />}HQ</button>
+      <button className={tab === "hq" ? "tab on" : "tab"} onClick={() => setTab("hq")}>{icons && <IconHome />}Overview</button>
       <span className="tab-group">
         <span className="tab-group-label">PIPELINE</span>
         <button className={tab === "organic" ? "tab on" : "tab"} onClick={() => setTab("organic")}>{icons && <IconSprout />}Organic</button>
@@ -269,13 +284,14 @@ export default function AnaraCastingDesk() {
   return (
     <div className="desk">
       <header className="top">
-        <div className="brand">
-          <div className="title-row">
-            <h1>ANARA Hiring HQ</h1>
-            {user && <span className="signed-in mono" title="Signed in">{user}</span>}
-          </div>
+        <div className="title-row">
+          <button className="ghost side-toggle" onClick={toggleSidebar} aria-label={sideHidden ? "Show sidebar" : "Hide sidebar"} title={sideHidden ? "Show sidebar" : "Hide sidebar"}>
+            <IconPanel />
+          </button>
+          <h1>{TAB_TITLES[tab] || "Overview"}</h1>
         </div>
         <div className="top-actions">
+          {user && <span className="signed-in" title="Signed in">{user}</span>}
           <button className="ghost" onClick={() => load({ keepPending: pendingCount > 0 })} disabled={loading || syncing}>Reload</button>
           <button className="primary" onClick={sync} disabled={!pendingCount || syncing}>
             {syncing ? "Saving…" : pendingCount ? `Save ${pendingCount} to Notion` : "Nothing to save"}
@@ -291,7 +307,7 @@ export default function AnaraCastingDesk() {
 
       {syncMsg && <div className={"banner" + (/failed/i.test(syncMsg) ? " bad" : "")}>{syncMsg}</div>}
 
-      <div className="frame">
+      <div className={"frame" + (sideHidden ? " noside" : "")}>
         <aside className="sidebar">
           <div className="workspace">
             <div className="workspace-mark" aria-hidden>A</div>
@@ -303,7 +319,7 @@ export default function AnaraCastingDesk() {
           {renderTrackSwitch()}
           <nav className="side-nav" aria-label="Sections">{renderNav({ icons: true })}</nav>
           <div className="side-funnel">
-            <div className="eyebrow">{track === "researcher" ? "RESEARCHER FUNNEL" : "FUNNEL"}</div>
+            <div className="eyebrow">{track === "researcher" ? "Researcher funnel" : "Funnel"}</div>
             {displayCounts.filter(({ stage }) => stage !== "Approved" && stage !== "Rejected").map(({ stage, n }) => (
               <div key={stage} className={"stage-row" + (stage === "New" ? " hot" : "")}>
                 <span>{stageLabel(stage)}</span><b>{n}</b>
@@ -396,7 +412,7 @@ export default function AnaraCastingDesk() {
                       {current.platform !== "LinkedIn" && <div><b className="mono">{fmt(current.views)}</b><label>VIEWS (SOURCED VIDEO)</label></div>}
                     </div>
                     <div className="body">
-                      <div className="eyebrow">WHY IT SCORED THIS WAY</div>
+                      <div className="eyebrow">Why it scored this way</div>
                       <p>{current.rationale || "No rationale recorded."}</p>
                       {current.notes && <p className="soft">{current.notes}</p>}
                       {current.email && (
@@ -551,7 +567,7 @@ export default function AnaraCastingDesk() {
                           </div>
                           {stage === "Rejected" ? (
                             <div className="pack">
-                              <div className="eyebrow" style={{ color: "var(--bad)" }}>QUEUED FOR REMOVAL</div>
+                              <div className="eyebrow" style={{ color: "var(--bad)" }}>Queued for removal</div>
                               <p className="soft">
                                 Press Save (top right) to confirm — they&apos;ll leave the pipeline as Rejected,
                                 and the scraper can never re-import them. Changed your mind?
@@ -595,7 +611,7 @@ export default function AnaraCastingDesk() {
       {fallbackText && (
         <div className="modal-back" role="dialog" aria-label="Copy manually">
           <div className="modal">
-            <div className="eyebrow">CLIPBOARD BLOCKED — SELECT AND COPY MANUALLY</div>
+            <div className="eyebrow">Clipboard blocked — select and copy manually</div>
             <textarea readOnly value={fallbackText} onFocus={(e) => e.target.select()} autoFocus />
             <button className="primary" onClick={() => setFallbackText(null)}>Done</button>
           </div>
@@ -613,7 +629,7 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
   );
   if (stage === "Approved") return (
     <div className="pack">
-      <div className="eyebrow">NEXT MOVE: SEND THE DM{email ? " + EMAIL" : ""}</div>
+      <div className="eyebrow">Next move: send the DM{email ? " + email" : ""}</div>
       <p className="soft">Follow them on TikTok first, then DM from your account — your personal template, editable under the Messages tab.{email ? " They list an email too — reaching out on both channels lifts reply rates." : ""}</p>
       <C k="p-dm" text={dmFor(first)}>Copy outreach DM</C>
       {email && (
@@ -627,14 +643,14 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
   );
   if (stage === "Contacted") return (
     <div className="pack">
-      <div className="eyebrow">WAITING ON A REPLY</div>
+      <div className="eyebrow">Waiting on a reply</div>
       <p className="soft">When they reply, move to Replied. If nothing after ~5 days, one polite bump from the Message Bank, then let it go.</p>
       <L href={LINKS.messageBank}>Outreach Message Bank</L>
     </div>
   );
   if (stage === "Replied") return (
     <div className="pack">
-      <div className="eyebrow">BOOK THE INTERVIEW</div>
+      <div className="eyebrow">Book the interview</div>
       <p className="soft">Answer their questions, share your booking link. You can interview multiple creators in one call to save time.</p>
       <L href={LINKS.interviewChecklist}>Interview Checklist</L>
       <L href={LINKS.interviewSlides}>Interview slides (make your own copy)</L>
@@ -642,7 +658,7 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
   );
   if (stage === "Interview") return (
     <div className="pack">
-      <div className="eyebrow">RUN THE CALL</div>
+      <div className="eyebrow">Run the call</div>
       <C k="p-intro" text={INTERVIEW_INTRO}>Copy intro script + non-compete check</C>
       <C k="p-close" text={INTERVIEW_CLOSE}>Copy closing script</C>
       <L href={LINKS.interviewSlides}>Interview slides</L>
@@ -681,7 +697,7 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
   const toggle = (key) => onSign({ ...s, [key]: !s[key] });
   return (
     <div className="pack">
-      <div className="eyebrow">ONBOARDED — FINISH SETUP ({done}/{steps.length})</div>
+      <div className="eyebrow">Onboarded — finish setup ({done}/{steps.length})</div>
       {steps.map((st, i) => (
         <div key={st.key} className={"sign-step" + (s[st.key] ? " done" : "")}>
           <button className="sign-check" onClick={() => toggle(st.key)} aria-label={s[st.key] ? "Mark incomplete" : "Mark done"}>

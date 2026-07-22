@@ -51,10 +51,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 .banner { padding: 10px 26px; font-size: 12.5px; font-weight: 600; background: var(--ok-bg); color: var(--ok); }
 .banner.bad { background: var(--bad-bg); color: var(--bad); }
 
-/* Full-width frame: sidebar hugs the left edge of the screen; only the
-   content column is width-capped so lines stay readable. */
+/* Full-width frame: sidebar hugs the left edge, content fills the rest
+   (capped only on ultrawide monitors so lines stay sane). */
 .frame { display: grid; grid-template-columns: 210px 1fr; gap: 26px; padding: 24px 26px; }
-.frame > main { max-width: 950px; }
+.frame > main { max-width: 1400px; }
+.frame.noside { grid-template-columns: 1fr; }
+.frame.noside .sidebar { display: none; }
 .hint { font-size: 12px; line-height: 1.55; color: var(--faint); margin-top: 14px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 22px 24px 8px; flex-wrap: wrap; }
@@ -210,6 +212,26 @@ select.input { appearance: none; }
 .hq-goal-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s var(--ease); }
 .hq-panel { padding: 20px 22px; }
 .hq-team { margin-top: 12px; }
+/* Stage tiles double as the chart's metric selector (Shortimize-style) */
+.kpi-btn { font-family: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color .16s var(--ease), box-shadow .16s var(--ease); }
+.kpi-btn:hover:not(.sel) { border-color: var(--border-2); }
+.kpi-btn.sel { border-color: var(--accent-border); box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-1); }
+
+/* Hero trend chart */
+.hq-chart { margin-top: 16px; padding: 18px 20px 12px; }
+.hq-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.trend-wrap { position: relative; }
+.trend { display: block; width: 100%; height: auto; }
+.trend-line { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.trend-grid { stroke: #EDEFF3; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.trend-ylabel, .trend-xlabel { font-size: 11px; fill: var(--faint); font-family: 'Spline Sans Mono', monospace; }
+.trend-dot-hit { fill: transparent; }
+.trend-dot-hit:hover { fill: var(--accent); fill-opacity: .25; }
+.trend-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; pointer-events: none; }
+
+/* Sidebar collapse toggle (desktop only — mobile has no sidebar) */
+.side-toggle { padding: 7px 9px; display: inline-flex; align-items: center; color: var(--soft); }
+@media (max-width: 900px) { .side-toggle { display: none; } }
 
 /* Floating toast (still used by manual flows) */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; width: max-content; max-width: min(92vw, 680px); border-radius: 10px; box-shadow: var(--shadow-lift); display: flex; align-items: center; gap: 14px; border: 1px solid var(--ok-border); }

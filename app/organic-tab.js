@@ -34,7 +34,7 @@ export default function OrganicTab({ onImported, track = "creator" }) {
   return (
     <div>
       <div className="card" style={{ padding: "20px 22px", marginBottom: 18 }}>
-        <div className="eyebrow">ADD FROM ORGANIC SCROLLING</div>
+        <div className="eyebrow">Add from organic scrolling</div>
         {track === "researcher" ? (
           <p className="soft" style={{ fontSize: 13.5, margin: "8px 0 0", lineHeight: 1.6 }}>
             Paste <b>LinkedIn profile links</b> for researchers you found by hand (up to 30 per batch,

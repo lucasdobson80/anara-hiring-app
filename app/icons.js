@@ -57,3 +57,7 @@ export const IconClapper = (p) => (
 export const IconFlask = (p) => (
   <svg {...nav} {...p}><path d="M10 3v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9V3" /><path d="M8 3h8" /><path d="M7 15h10" /></svg>
 );
+
+export const IconPanel = (p) => (
+  <svg {...nav} width={16} height={16} {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9.5 4v16" /></svg>
+);
