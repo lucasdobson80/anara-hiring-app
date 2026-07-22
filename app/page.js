@@ -260,6 +260,20 @@ export default function AnaraCastingDesk() {
     const s = readSign(id);
     return { done: SIGN_STEPS.filter((k) => s[k]).length, total: SIGN_STEPS.length };
   };
+  // Mark a follow-up bump as sent: Notion note (permanent, cross-device)
+  // plus an optimistic local update so the row leaves the queue instantly.
+  const markBumped = (c) => {
+    setRoster((rs) => rs.map((r) => (r.id === c.id ? { ...r, notes: ((r.notes || "") + " · follow-up bump sent").trim() } : r)));
+    fetch("/api/onboard-note", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pageId: c.id, kind: "bump" }),
+    }).catch(() => {});
+  };
+  const copyBump = (c) => {
+    copy("bump-" + c.id, renderDm(messages["Follow-up bump"], firstNameOf(c.name)));
+    markBumped(c);
+  };
+
   const appendOnboardNote = async (id) => {
     try {
       await fetch("/api/onboard-note", {
@@ -536,6 +550,43 @@ export default function AnaraCastingDesk() {
               )}
               {!loading && !error && roster.length > 0 && (
                 <>
+                {(() => {
+                  // The follow-up lever: Contacted 5–14 days ago, no reply, not
+                  // yet bumped. One polite bump each, then let them go (the
+                  // 14-day stale bucket takes over).
+                  const now = Date.now();
+                  const due = roster
+                    .filter((c) => {
+                      if (stageOf(c) !== "Contacted") return false;
+                      if (/follow-up bump sent/.test(c.notes || "")) return false;
+                      const ref = c.contactedAt || c.lastEdited;
+                      if (!ref) return false;
+                      const days = (now - Date.parse(ref)) / 86400000;
+                      return days >= 5 && days < 14;
+                    })
+                    .sort((a, b) => Date.parse(a.contactedAt || a.lastEdited) - Date.parse(b.contactedAt || b.lastEdited));
+                  if (!due.length) return null;
+                  const daysAgo = (c) => Math.floor((now - Date.parse(c.contactedAt || c.lastEdited)) / 86400000);
+                  return (
+                    <div className="card bump-card">
+                      <div className="bump-head">
+                        <span className="eyebrow">Needs a bump today · {due.length}</span>
+                        <span className="hint" style={{ margin: 0 }}>contacted 5+ days ago, no reply — one polite bump, then let it go</span>
+                      </div>
+                      {due.slice(0, 6).map((c) => (
+                        <div key={c.id} className="bump-row">
+                          <a className="bump-name" href={c.link || "#"} target="_blank" rel="noreferrer">{c.name || c.handle} <IconExt width={11} height={11} /></a>
+                          <span className="mono soft bump-days">{daysAgo(c)}d ago</span>
+                          <button className="ghost tiny" onClick={() => copyBump(c)}>
+                            {copiedKey === "bump-" + c.id ? "Copied ✓" : "Copy bump · mark sent"}
+                          </button>
+                          <button className="ghost tiny" title="Skip — mark bumped without copying" onClick={() => markBumped(c)}>✕</button>
+                        </div>
+                      ))}
+                      {due.length > 6 && <div className="hint" style={{ marginTop: 8 }}>+{due.length - 6} more — they&apos;ll surface here as you clear these.</div>}
+                    </div>
+                  );
+                })()}
                 <div className="onboard-tools">
                   <input
                     className="input"
