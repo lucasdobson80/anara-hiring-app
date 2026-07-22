@@ -221,7 +221,8 @@ select.input { appearance: none; }
 
 /* Hero trend chart — its own look: thinner line, visible data points,
    dashed grid, crosshair tooltip (not a Shortimize clone) */
-.hq-chart { margin-top: 16px; padding: 18px 20px 12px; }
+/* overflow must stay visible or the crosshair tooltip clips at the card edge */
+.hq-chart { margin-top: 16px; padding: 18px 20px 12px; overflow: visible; }
 .hq-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .trend-wrap { position: relative; }
 .trend { display: block; width: 100%; height: auto; cursor: crosshair; }
@@ -240,9 +241,11 @@ select.input { appearance: none; }
 .side-toggle { padding: 7px 9px; display: inline-flex; align-items: center; color: var(--soft); }
 @media (max-width: 900px) { .side-toggle { display: none; } }
 
-/* ── Collapsed sidebar: fully hidden, content takes the whole width ── */
+/* ── Collapsed sidebar: fully hidden, content takes the whole width,
+   centered so the gutters match on both sides once the cap kicks in ── */
 .frame.noside { grid-template-columns: 1fr; }
 .frame.noside .sidebar { display: none; }
+.frame.noside > main { margin: 0 auto; width: 100%; }
 
 /* Floating toast (still used by manual flows) */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; width: max-content; max-width: min(92vw, 680px); border-radius: 10px; box-shadow: var(--shadow-lift); display: flex; align-items: center; gap: 14px; border: 1px solid var(--ok-border); }
@@ -323,6 +326,24 @@ select.input { appearance: none; }
 /* ── Onboard stale toggle · signing wizard · messages bank ── */
 .stale-toggle { display: block; width: 100%; text-align: left; background: none; border: 1px dashed var(--border-2); color: var(--soft); border-radius: 9px; padding: 9px 12px; margin: 4px 0 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .stale-toggle:hover { border-color: var(--faint); color: var(--text); }
+
+/* Playbook card header: platform badge + identity + stage stepper */
+.play-head { display: flex; align-items: flex-start; gap: 12px; padding: 0 0 14px; }
+.platform-badge { width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--soft); flex-shrink: 0; transition: color .16s var(--ease), border-color .16s var(--ease); }
+.platform-badge:hover { color: var(--accent); border-color: var(--accent-border); }
+.play-id { flex: 1; min-width: 0; }
+.play-id .name { font-size: 20px; }
+.stage-progress { display: flex; align-items: center; margin: 2px 0 18px; }
+.sp-step { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--faint); white-space: nowrap; background: none; border: none; padding: 4px 2px; font-family: inherit; cursor: pointer; border-radius: 6px; transition: color .16s var(--ease); }
+.sp-step:hover:not(.now) { color: var(--text); }
+.sp-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-2); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.sp-step.done { color: var(--soft); }
+.sp-step.done .sp-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sp-step.now { color: var(--accent); }
+.sp-step.now .sp-dot { border-color: var(--accent); background: var(--accent-soft); }
+.sp-line { flex: 1; height: 2px; background: var(--border); margin: 0 8px; min-width: 14px; border-radius: 1px; }
+.sp-line.done { background: var(--accent); }
+@media (max-width: 600px) { .stage-progress { flex-wrap: wrap; gap: 6px 0; } }
 
 /* Roster row: let the name truncate so the badges never overflow the row */
 .rname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -131,15 +131,21 @@ function TrendChart({ series, metric, label }) {
           )
         ))}
       </svg>
-      {hover != null && (
-        <div
-          className="trend-tip"
-          style={{ left: `${(x(hover) / W) * 100}%`, top: `${(y(vals[hover]) / H) * 100}%` }}
-        >
-          <div className="trend-tip-date">{fmtLong(series[hover].date)}</div>
-          <div className="trend-tip-val"><b>{vals[hover]}</b> {label.toLowerCase()}</div>
-        </div>
-      )}
+      {hover != null && (() => {
+        // Slide the tooltip inward near the chart's ends so it never
+        // dangles awkwardly past the card
+        const pct = (x(hover) / W) * 100;
+        const shift = pct < 9 ? "-12%" : pct > 91 ? "-88%" : "-50%";
+        return (
+          <div
+            className="trend-tip"
+            style={{ left: `${pct}%`, top: `${(y(vals[hover]) / H) * 100}%`, transform: `translate(${shift}, calc(-100% - 14px))` }}
+          >
+            <div className="trend-tip-date">{fmtLong(series[hover].date)}</div>
+            <div className="trend-tip-val"><b>{vals[hover]}</b> {label.toLowerCase()}</div>
+          </div>
+        );
+      })()}
       {flat && <div className="trend-empty soft">No {label.toLowerCase()} activity in this window yet.</div>}
     </div>
   );

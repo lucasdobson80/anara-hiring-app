@@ -10,7 +10,9 @@ import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
 import MessagesTab from "./messages-tab";
-import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask, IconPanel } from "./icons";
+import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask, IconPanel, IconTikTok, IconInstagram, IconLinkedIn } from "./icons";
+
+const PLATFORM_ICONS = { TikTok: IconTikTok, Instagram: IconInstagram, LinkedIn: IconLinkedIn };
 
 // Top-bar page titles (the wordmark lives in the sidebar workspace block)
 const TAB_TITLES = { hq: "Overview", organic: "Organic", onboard: "Onboard", source: "Source", review: "Review", messages: "Messages" };
@@ -605,12 +607,19 @@ export default function AnaraCastingDesk() {
                       if (!c) return null;
                       const stage = stageOf(c);
                       const first = firstNameOf(c.name);
+                      const platform = c.platform || "TikTok";
+                      const PlatformIcon = PLATFORM_ICONS[platform] || IconTikTok;
+                      // The stepper IS the stage control — click a step to move them
+                      const spIdx = ONBOARD_STAGES.indexOf(stage);
                       return (
                         <div>
-                          <div className="card-head" style={{ padding: "0 0 12px" }}>
-                            <div>
+                          <div className="play-head">
+                            <a className="platform-badge" href={c.link || "#"} target="_blank" rel="noreferrer" title={`Open their ${platform}`} aria-label={`Open their ${platform} profile`}>
+                              <PlatformIcon />
+                            </a>
+                            <div className="play-id">
                               <div className="name">{c.name || c.handle}</div>
-                              <a className="mono soft" href={c.link || "#"} target="_blank" rel="noreferrer">{c.handle} <IconExt width={12} height={12} /></a>
+                              <a className="mono soft" href={c.link || "#"} target="_blank" rel="noreferrer">{c.handle} · {platform} <IconExt width={12} height={12} /></a>
                             </div>
                             {stage !== "Rejected" && (
                               <button className="reject small" onClick={() => moveStage(c, "Rejected")}>
@@ -618,6 +627,23 @@ export default function AnaraCastingDesk() {
                               </button>
                             )}
                           </div>
+                          {spIdx >= 0 && (
+                            <div className="stage-progress" aria-label="Stage progress — click a step to move them">
+                              {ONBOARD_STAGES.map((s, i) => (
+                                <span key={s} style={{ display: "contents" }}>
+                                  {i > 0 && <span className={"sp-line" + (i <= spIdx ? " done" : "")} />}
+                                  <button
+                                    className={"sp-step" + (i < spIdx ? " done" : i === spIdx ? " now" : "")}
+                                    title={s === stage ? `Current stage: ${stageLabel(s)}` : `Move to ${stageLabel(s)}`}
+                                    onClick={() => s !== stage && moveStage(c, s)}
+                                  >
+                                    <span className="sp-dot">{i < spIdx ? <IconCheck width={9} height={9} /> : null}</span>
+                                    {stageLabel(s)}
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {stage === "Rejected" ? (
                             <div className="pack">
                               <div className="eyebrow" style={{ color: "var(--bad)" }}>Queued for removal</div>
@@ -631,11 +657,6 @@ export default function AnaraCastingDesk() {
                             </div>
                           ) : (
                             <>
-                              <div className="stepper">
-                                {ONBOARD_STAGES.map((s) => (
-                                  <button key={s} className={"chip" + (s === stage ? " on" : "")} onClick={() => moveStage(c, s)}>{stageLabel(s)}</button>
-                                ))}
-                              </div>
                               <StagePack
                                 stage={stage} first={first} email={c.email}
                                 copy={copy} copyRich={copyRich} copiedKey={copiedKey} dmFor={dmFor}
