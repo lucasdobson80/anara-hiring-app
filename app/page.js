@@ -269,11 +269,6 @@ export default function AnaraCastingDesk() {
       body: JSON.stringify({ pageId: c.id, kind: "bump" }),
     }).catch(() => {});
   };
-  const copyBump = (c) => {
-    copy("bump-" + c.id, renderDm(messages["Follow-up bump"], firstNameOf(c.name)));
-    markBumped(c);
-  };
-
   const appendOnboardNote = async (id) => {
     try {
       await fetch("/api/onboard-note", {
@@ -550,43 +545,6 @@ export default function AnaraCastingDesk() {
               )}
               {!loading && !error && roster.length > 0 && (
                 <>
-                {(() => {
-                  // The follow-up lever: Contacted 5–14 days ago, no reply, not
-                  // yet bumped. One polite bump each, then let them go (the
-                  // 14-day stale bucket takes over).
-                  const now = Date.now();
-                  const due = roster
-                    .filter((c) => {
-                      if (stageOf(c) !== "Contacted") return false;
-                      if (/follow-up bump sent/.test(c.notes || "")) return false;
-                      const ref = c.contactedAt || c.lastEdited;
-                      if (!ref) return false;
-                      const days = (now - Date.parse(ref)) / 86400000;
-                      return days >= 5 && days < 14;
-                    })
-                    .sort((a, b) => Date.parse(a.contactedAt || a.lastEdited) - Date.parse(b.contactedAt || b.lastEdited));
-                  if (!due.length) return null;
-                  const daysAgo = (c) => Math.floor((now - Date.parse(c.contactedAt || c.lastEdited)) / 86400000);
-                  return (
-                    <div className="card bump-card">
-                      <div className="bump-head">
-                        <span className="eyebrow">Needs a bump today · {due.length}</span>
-                        <span className="hint" style={{ margin: 0 }}>contacted 5+ days ago, no reply — one polite bump, then let it go</span>
-                      </div>
-                      {due.slice(0, 6).map((c) => (
-                        <div key={c.id} className="bump-row">
-                          <a className="bump-name" href={c.link || "#"} target="_blank" rel="noreferrer">{c.name || c.handle} <IconExt width={11} height={11} /></a>
-                          <span className="mono soft bump-days">{daysAgo(c)}d ago</span>
-                          <button className="ghost tiny" onClick={() => copyBump(c)}>
-                            {copiedKey === "bump-" + c.id ? "Copied ✓" : "Copy bump · mark sent"}
-                          </button>
-                          <button className="ghost tiny" title="Skip — mark bumped without copying" onClick={() => markBumped(c)}>✕</button>
-                        </div>
-                      ))}
-                      {due.length > 6 && <div className="hint" style={{ marginTop: 8 }}>+{due.length - 6} more — they&apos;ll surface here as you clear these.</div>}
-                    </div>
-                  );
-                })()}
                 <div className="onboard-tools">
                   <input
                     className="input"
@@ -759,6 +717,10 @@ export default function AnaraCastingDesk() {
                               <StagePack
                                 stage={stage} first={first} email={c.email}
                                 copy={copy} copyRich={copyRich} copiedKey={copiedKey} dmFor={dmFor}
+                                bump={renderDm(messages["Follow-up bump"], first)}
+                                bumpDays={(c.contactedAt || c.lastEdited) ? Math.floor((Date.now() - Date.parse(c.contactedAt || c.lastEdited)) / 86400000) : null}
+                                bumped={/follow-up bump sent/.test(c.notes || "")}
+                                onBump={() => markBumped(c)}
                                 welcomeHtml={welcomeFor(first)}
                                 welcomeMsg={renderDm(messages["Welcome message"], first)}
                                 contractLink={messages["Contract template link"]}
@@ -795,7 +757,7 @@ export default function AnaraCastingDesk() {
   );
 }
 
-function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welcomeHtml, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
+function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump, bumpDays, bumped, onBump, welcomeHtml, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -817,7 +779,13 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, welc
   if (stage === "Contacted") return (
     <div className="pack">
       <div className="eyebrow">Waiting on a reply</div>
-      <p className="soft">When they reply, move to Replied. If nothing after ~5 days, one polite bump from the Message Bank, then let it go.</p>
+      <p className="soft">
+        When they reply, move to Replied. If nothing after ~5 days, one polite bump, then let it go.
+        {bumpDays != null && <> Contacted <b>{bumpDays}d ago</b>.</>}{bumped && " A bump was already sent."}
+      </p>
+      <button className="res copybtn" onClick={() => { copy("p-bump", bump); onBump?.(); }}>
+        {copiedKey === "p-bump" ? "Copied ✓" : "Copy bump message"}
+      </button>
       <L href={LINKS.messageBank}>Outreach Message Bank</L>
     </div>
   );

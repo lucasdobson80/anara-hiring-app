@@ -356,15 +356,6 @@ select.input { appearance: none; }
 .sp-line.done { background: var(--accent); }
 @media (max-width: 600px) { .stage-progress { flex-wrap: wrap; gap: 6px 0; } }
 
-/* Needs-a-bump queue: the follow-up lever, top of Onboard */
-.bump-card { padding: 14px 18px; margin-bottom: 14px; border-color: var(--accent-border); }
-.bump-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
-.bump-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
-.bump-row:first-of-type { border-top: none; }
-.bump-name { flex: 1; min-width: 0; color: var(--text); text-decoration: none; font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bump-name:hover { color: var(--accent); }
-.bump-days { font-size: 12px; white-space: nowrap; }
-
 /* Playbook meta: the creator's numbers + tags fill the card usefully */
 .play-meta { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
 .pm-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; min-width: 104px; }
