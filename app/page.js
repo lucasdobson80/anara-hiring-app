@@ -73,6 +73,7 @@ export default function AnaraCastingDesk() {
   const [onboardSearch, setOnboardSearch] = useState("");
   const [onboardStage, setOnboardStage] = useState("All");
   const [showStale, setShowStale] = useState(false); // Contacted, no reply >2wk
+  const [expandedStages, setExpandedStages] = useState({}); // stage -> show full list
   const [user, setUser] = useState(null);
   const [team, setTeam] = useState(["lucas", "laia", "alba"]);
   const [track, setTrack] = useState("creator"); // "creator" (UGC) | "researcher"
@@ -98,6 +99,37 @@ export default function AnaraCastingDesk() {
   useEffect(() => {
     try { const t = localStorage.getItem("cd_track"); if (t === "researcher" || t === "creator") setTrack(t); } catch {}
   }, []);
+
+  // Workspace logo (team-wide, stored in the settings KV store). Click the
+  // mark in the sidebar to upload; the image is cover-cropped to 96px square
+  // client-side so the stored data URL stays tiny.
+  const [logo, setLogo] = useState(null);
+  const logoInputRef = useRef(null);
+  useEffect(() => {
+    fetch("/api/settings/logo").then((r) => r.json()).then((d) => { if (d.logo) setLogo(d.logo); }).catch(() => {});
+  }, []);
+  const onLogoPick = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const c = document.createElement("canvas");
+      c.width = 96; c.height = 96;
+      const s = Math.min(img.width, img.height);
+      c.getContext("2d").drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 96, 96);
+      const data = c.toDataURL("image/png");
+      setLogo(data);
+      fetch("/api/settings/logo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logo: data }),
+      }).catch(() => {});
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  };
 
   // Collapsible sidebar (persisted per browser)
   const [sideHidden, setSideHidden] = useState(false);
@@ -314,7 +346,10 @@ export default function AnaraCastingDesk() {
       <div className={"frame" + (sideHidden ? " noside" : "")}>
         <aside className="sidebar">
           <div className="workspace">
-            <div className="workspace-mark" aria-hidden>A</div>
+            <button className="workspace-mark" title="Change logo" aria-label="Change workspace logo" onClick={() => logoInputRef.current?.click()}>
+              {logo ? <img src={logo} alt="" /> : "A"}
+            </button>
+            <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={onLogoPick} />
             <div className="workspace-text">
               <div className="workspace-name">Anara</div>
               <div className="workspace-sub">Hiring HQ</div>
@@ -518,6 +553,17 @@ export default function AnaraCastingDesk() {
                           </button>
                         );
                       };
+                      // Long stage groups collapse to the newest few — a
+                      // "Show all" toggle keeps the 300-strong Contacted list
+                      // from swallowing the page (search still finds everyone).
+                      const CAP = 8;
+                      const expanded = Boolean(expandedStages[stage]) || Boolean(q);
+                      const capped = (list) => (expanded ? list : list.slice(0, CAP));
+                      const moreToggle = (total) => total > CAP && !q && (
+                        <button className="stale-toggle" onClick={() => setExpandedStages((s) => ({ ...s, [stage]: !s[stage] }))}>
+                          {expanded ? "▾ Show fewer" : `▸ Show all ${total}`}
+                        </button>
+                      );
                       // Contacted with no reply for 2+ weeks tucks away — still
                       // in the system, just hidden until they move stage.
                       if (stage === "Contacted") {
@@ -529,8 +575,9 @@ export default function AnaraCastingDesk() {
                         const stale = members.filter(isStale);
                         return (
                           <div key={stage}>
-                            <div className="roster-head"><span>CONTACTED</span><span>{members.length}</span></div>
-                            {fresh.map(rowOf)}
+                            <div className="roster-head"><span>Contacted</span><span>{members.length}</span></div>
+                            {capped(fresh).map(rowOf)}
+                            {moreToggle(fresh.length)}
                             {stale.length > 0 && (
                               <>
                                 <button className="stale-toggle" onClick={() => setShowStale((s) => !s)}>
@@ -544,8 +591,9 @@ export default function AnaraCastingDesk() {
                       }
                       return (
                         <div key={stage}>
-                          <div className="roster-head"><span>{stageLabel(stage).toUpperCase()}</span><span>{members.length}</span></div>
-                          {members.map(rowOf)}
+                          <div className="roster-head"><span>{stageLabel(stage)}</span><span>{members.length}</span></div>
+                          {capped(members).map(rowOf)}
+                          {moreToggle(members.length)}
                         </div>
                       );
                     })}

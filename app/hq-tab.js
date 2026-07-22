@@ -22,6 +22,26 @@ const REL = {
   month: { 0: "This month", "-1": "Last month" },
 };
 
+// Friendly labels for the period dropdown — offsets 0…-11, matching the
+// server's UTC period math (day / Monday-week / month).
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function offsetLabel(period, o) {
+  if (REL[period]?.[String(o)]) return REL[period][String(o)];
+  const now = new Date();
+  if (period === "day") {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + o));
+    return `${WD[d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`;
+  }
+  if (period === "month") {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + o, 1));
+    return `${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + o * 7);
+  return `Week of ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`;
+}
+
 // ── Hero area chart: smooth indigo line, visible data points, dashed
 // grid, and an interactive crosshair tooltip. Deliberately its own look
 // (dots + dashed grid) rather than a Shortimize clone.
@@ -173,11 +193,14 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
             <button key={p} className={period === p ? "chip on" : "chip"} onClick={() => pickPeriod(p)}>{label}</button>
           ))}
         </div>
-        <div className="hq-period-nav">
-          <button className="ghost tiny" aria-label="Previous" onClick={() => setOffset((o) => o - 1)}>‹</button>
-          <span className="hq-period-label mono">{data?.label || "…"}{rel ? <span className="soft"> · {rel}</span> : null}</span>
-          <button className="ghost tiny" aria-label="Next" disabled={offset >= 0} onClick={() => setOffset((o) => Math.min(0, o + 1))}>›</button>
-        </div>
+        <select
+          className="input period-select" aria-label="Time window"
+          value={offset} onChange={(e) => setOffset(Number(e.target.value))}
+        >
+          {Array.from({ length: 12 }, (_, i) => -i).map((o) => (
+            <option key={o} value={o}>{offsetLabel(period, o)}</option>
+          ))}
+        </select>
         <div className="scope-toggle" style={{ marginLeft: "auto" }}>
           <button className={scope === "mine" ? "on" : ""} onClick={() => setScope("mine")}>My stats</button>
           <button className={scope === "all" ? "on" : ""} onClick={() => setScope("all")}>Team stats</button>
