@@ -236,19 +236,9 @@ select.input { appearance: none; }
 .side-toggle { padding: 7px 9px; display: inline-flex; align-items: center; color: var(--soft); }
 @media (max-width: 900px) { .side-toggle { display: none; } }
 
-/* ── Collapsed sidebar = icon rail (Shortimize-style): icons stay,
-   labels/funnel/hint hide, everything centered in a 64px column ── */
-.frame.noside { grid-template-columns: 64px 1fr; }
-.frame.noside .sidebar { display: flex; }
-.frame.noside .nav-label, .frame.noside .tab-group-label,
-.frame.noside .workspace-text, .frame.noside .workspace .signed-in,
-.frame.noside .side-funnel, .frame.noside .sidebar .hint { display: none; }
-.frame.noside .workspace { justify-content: center; padding: 2px 0; }
-.frame.noside .track-switch { background: none; padding: 0; gap: 4px; }
-.frame.noside .track-switch button { justify-content: center; padding: 8px 0; }
-.frame.noside .track-switch button.on { background: var(--surface-2); box-shadow: none; }
-.frame.noside .side-nav .tab { justify-content: center; padding: 9px 0; gap: 0; }
-.frame.noside .side-nav .tab-group { padding: 8px 0 0; }
+/* ── Collapsed sidebar: fully hidden, content takes the whole width ── */
+.frame.noside { grid-template-columns: 1fr; }
+.frame.noside .sidebar { display: none; }
 
 /* Floating toast (still used by manual flows) */
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; width: max-content; max-width: min(92vw, 680px); border-radius: 10px; box-shadow: var(--shadow-lift); display: flex; align-items: center; gap: 14px; border: 1px solid var(--ok-border); }
