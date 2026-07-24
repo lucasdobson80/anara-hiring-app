@@ -171,10 +171,15 @@ export default function AnaraCastingDesk() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Full-screen flash on track switch — you can't miss that you changed
-  // worlds, and it masks the moment where the old track's data lingers.
+  // Full-screen flash on track switch — stays up until the new track's data
+  // has ACTUALLY loaded (shell pipeline + the active tab's own fetch), with
+  // a short minimum so fast loads don't blink and an 8s cap so a hung
+  // request can't trap it.
   const [trackFlash, setTrackFlash] = useState(null);
-  const flashTimerRef = useRef(null);
+  const [flashClosing, setFlashClosing] = useState(false);
+  const [tabBusy, setTabBusy] = useState(false);
+  const flashStartRef = useRef(0);
+  const reportTabBusy = useCallback((busy) => setTabBusy(Boolean(busy)), []);
   const switchTrack = (t) => {
     if (t === track) return;
     setTrack(t);
@@ -182,10 +187,26 @@ export default function AnaraCastingDesk() {
     setSelected(null);
     setPending({});
     setTrackFlash(t);
-    clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = setTimeout(() => setTrackFlash(null), 950);
+    setFlashClosing(false);
+    flashStartRef.current = Date.now();
     // load() refetches automatically (track is a dep of the load callback)
   };
+  useEffect(() => {
+    if (!trackFlash || flashClosing) return;
+    if (loading || tabBusy) return; // data still on its way — hold the overlay
+    const elapsed = Date.now() - flashStartRef.current;
+    const t = setTimeout(() => {
+      setFlashClosing(true);
+      setTimeout(() => { setTrackFlash(null); setFlashClosing(false); }, 300);
+    }, Math.max(0, 650 - elapsed));
+    return () => clearTimeout(t);
+  }, [trackFlash, flashClosing, loading, tabBusy]);
+  useEffect(() => {
+    if (!trackFlash) return;
+    const cap = setTimeout(() => { setTrackFlash(null); setFlashClosing(false); }, 15000);
+    return () => clearTimeout(cap);
+  }, [trackFlash]);
+  const dismissFlash = () => { setTrackFlash(null); setFlashClosing(false); };
 
   const remaining = queue.filter((c) => !pending[c.id]);
   const current = remaining[0];
@@ -362,10 +383,11 @@ export default function AnaraCastingDesk() {
 
       {syncMsg && <div className={"banner" + (/failed/i.test(syncMsg) ? " bad" : "")}>{syncMsg}</div>}
       {trackFlash && (
-        <div className="track-flash" role="status" aria-live="polite">
+        <div className={"track-flash" + (flashClosing ? " closing" : "")} role="status" aria-live="polite" onClick={dismissFlash} title="Click to dismiss">
           <div className="track-flash-inner">
             {trackFlash === "researcher" ? <IconFlask width={30} height={30} /> : <IconClapper width={30} height={30} />}
             <span>{trackFlash === "researcher" ? "Researchers" : "UGC Creators"}</span>
+            <span className="track-flash-hint soft">loading…</span>
           </div>
         </div>
       )}
@@ -515,11 +537,11 @@ export default function AnaraCastingDesk() {
             </>
           )}
 
-          {tab === "source" && <SourceTab track={track} onImported={() => load({ keepPending: pendingCount > 0 })} />}
+          {tab === "source" && <SourceTab track={track} onBusyChange={reportTabBusy} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
           {tab === "organic" && <OrganicTab track={track} onImported={() => load({ keepPending: pendingCount > 0 })} />}
 
-          {tab === "hq" && <HqTab team={team} user={user} track={track} />}
+          {tab === "hq" && <HqTab team={team} user={user} track={track} onBusyChange={reportTabBusy} />}
 
           {tab === "messages" && <MessagesTab messages={messages} onSaved={setMessages} user={user} copy={copy} copyRich={copyRich} copiedKey={copiedKey} />}
 

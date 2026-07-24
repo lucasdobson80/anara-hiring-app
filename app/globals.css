@@ -245,12 +245,16 @@ select.input { appearance: none; }
 /* Track cue: persistent top-bar tag when on the researcher track */
 .track-tag { display: inline-flex; align-items: center; gap: 5px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; }
 
-/* Track switch flash: brief full-screen announcement of the new world */
-@keyframes cd-track-flash { 0% { opacity: 0; } 18% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
-.track-flash { position: fixed; inset: 0; z-index: 80; background: rgba(246, 247, 249, 0.94); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; pointer-events: none; animation: cd-track-flash .95s var(--ease) forwards; }
+/* Track switch flash: full-screen announcement that stays up until the
+   new track's data has actually loaded, then fades out */
+@keyframes cd-track-flash-in { from { opacity: 0; } to { opacity: 1; } }
+.track-flash { position: fixed; inset: 0; z-index: 80; background: rgba(246, 247, 249, 0.94); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; animation: cd-track-flash-in .18s var(--ease); transition: opacity .3s var(--ease); }
+.track-flash.closing { opacity: 0; }
 .track-flash-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text); font-size: 20px; font-weight: 700; }
 .track-flash-inner svg { color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .track-flash { animation: none; } }
+@keyframes cd-flash-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+.track-flash-hint { font-size: 12px; font-weight: 600; animation: cd-flash-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .track-flash, .track-flash-hint { animation: none; } }
 
 /* ── Collapsed sidebar: fully hidden, content takes the whole width,
    centered so the gutters match on both sides once the cap kicks in ── */

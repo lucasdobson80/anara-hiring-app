@@ -151,7 +151,7 @@ function TrendChart({ series, metric, label }) {
   );
 }
 
-export default function HqTab({ user: initialUser, team: initialTeam, track = "creator" }) {
+export default function HqTab({ user: initialUser, team: initialTeam, track = "creator", onBusyChange }) {
   const [period, setPeriod] = useState("week");
   const [offset, setOffset] = useState(0);
   const [scope, setScope] = useState("mine");
@@ -178,6 +178,11 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
   }, [period, offset, scope, track]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Report our own loading up to the shell so the track-switch overlay can
+  // hold until this tab's data is really in (and clear on unmount).
+  useEffect(() => { onBusyChange?.(loading); }, [loading, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
 
   // Switching period resets to the current window (offsets don't map across day/week/month)
   const pickPeriod = (p) => { setPeriod(p); setOffset(0); };

@@ -37,8 +37,9 @@ const RESEARCHER_COUNTRIES = ["United States", "United Kingdom", "Canada", "Aust
 const LI_PER_PROFILE = 0.004; // full profile
 const LI_PER_PAGE = 0.1;      // per 25-result search page
 
-export default function SourceTab({ onImported, scope = "mine", track = "creator" }) {
+export default function SourceTab({ onImported, scope = "mine", track = "creator", onBusyChange }) {
   const [status, setStatus] = useState(null); // { ready, spend, runs, estPerResult }
+  const [statusLoading, setStatusLoading] = useState(false);
   const [error, setError] = useState(null);
   // Researcher form state
   const [rRoles, setRRoles] = useState(["Medical Writer"]);
@@ -78,6 +79,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   };
 
   const loadStatus = useCallback(async () => {
+    setStatusLoading(true);
     try {
       const res = await fetch(`/api/source/status?scope=${scope}&track=${track}`);
       const data = await res.json();
@@ -88,10 +90,14 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
     } catch (e) {
       setError("Couldn't reach Apify: " + e.message);
       return null;
-    }
+    } finally { setStatusLoading(false); }
   }, [scope, track]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  // Report loading up to the shell (track-switch overlay holds on it)
+  useEffect(() => { onBusyChange?.(statusLoading); }, [statusLoading, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
 
   // Poll while any run is still scraping, an import is running (here or on
   // another device — the checkpoints feed the progress bar), or a partial
