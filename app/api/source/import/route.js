@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   hasApifyToken, getRun, getDatasetItems, aggregateCandidates, aggregateResearchers,
-  aggregateUgcLinkedIn, getRunRecord, setRunRecord, setSetting, COUNTRY_CODE,
+  aggregateUgcLinkedIn, igUsernamesFromItems, runInstagram, getRunRecord, setRunRecord,
+  setSetting, COUNTRY_CODE,
 } from "@/lib/apify";
 import { hasAnthropicKey, scoreCandidates } from "@/lib/scoring";
 import { fetchAllCreators, createCreator, handleExists, normHandle } from "@/lib/notion";
@@ -97,21 +98,30 @@ export async function POST(request) {
     const config = (await getRunRecord(kvId, CONFIG_KEY).catch(() => null)) || {};
     const track = config.track === "researcher" ? "researcher" : "creator";
     const isUgcLinkedIn = track === "creator" && config.platform === "LinkedIn";
+    const isIgResearcher = track === "researcher" && config.platform === "Instagram";
     const days = config.days || body.days || 30;
     const minFollowers = config.minFollowers ?? 1000;
     const maxFollowers = config.maxFollowers ?? 150000;
     const ugcOnly = Boolean(config.ugcOnly);
     const threshold = Math.min(Math.max(config.threshold || body.threshold || 70, 60), 85);
-    // LinkedIn = researcher track OR creator UGC-LinkedIn; else TikTok
-    const platform = track === "researcher" || isUgcLinkedIn ? "LinkedIn" : "TikTok";
+    const platform = isIgResearcher ? "Instagram" : track === "researcher" || isUgcLinkedIn ? "LinkedIn" : "TikTok";
     const countries = config.countries || [];
     const countryCodes = countries.map((c) => COUNTRY_CODE[c]).filter(Boolean);
 
     const items = await getDatasetItems(run.defaultDatasetId);
     let candidates, filtered, uniqueCreators;
-    if (track === "researcher") {
+    if (isIgResearcher) {
+      // Discovery runs only carry usernames — profiles are enriched below,
+      // AFTER the dedupe, so we never pay to re-scrape known people.
+      const usernames = igUsernamesFromItems(items, config.igMode);
+      candidates = usernames.map((u) => ({ handle: u }));
+      filtered = {};
+      uniqueCreators = usernames.length;
+    } else if (track === "researcher") {
       const r = aggregateResearchers(items);
       ({ candidates, filtered } = r); uniqueCreators = r.uniqueProfiles;
+      // Combo walked to the end → loop its pagination cursor back to page 1
+      if (items.length === 0 && config.cursorKey) await setSetting(config.cursorKey, { startPage: 1, at: Date.now() });
     } else if (isUgcLinkedIn) {
       const r = aggregateUgcLinkedIn(items, countryCodes);
       ({ candidates, filtered } = r); uniqueCreators = r.uniqueProfiles;
@@ -134,8 +144,15 @@ export async function POST(request) {
     );
     const fresh = candidates.filter((c) => !known.has(normHandle(c.handle)));
 
-    const batch = fresh.slice(0, BATCH_CAP);
+    // IG discovery uses a smaller cap — each pass also runs a synchronous
+    // profile-enrichment scrape, which takes real time.
+    let batch = fresh.slice(0, isIgResearcher ? 30 : BATCH_CAP);
     const remaining = fresh.length - batch.length;
+    if (isIgResearcher && batch.length) {
+      const enriched = await runInstagram({ usernames: batch.map((c) => c.handle) });
+      filtered.enrichFailed = (filtered.enrichFailed || 0) + (batch.length - enriched.length);
+      batch = enriched; // private/dead accounts drop out here
+    }
 
     // Progress for the run card's bar: how many of this run's fresh
     // creators have been scored, across all passes so far.
@@ -172,8 +189,9 @@ export async function POST(request) {
       let results;
       try {
         ({ results } = await scoreCandidates(chunk, threshold, {
-          researcher: track === "researcher",
+          researcher: track === "researcher" && !isIgResearcher,
           ugcLinkedIn: isUgcLinkedIn,
+          igResearcher: isIgResearcher,
           countries,
         }));
       } catch (e) {
@@ -193,7 +211,10 @@ export async function POST(request) {
         let rationale = s.hard_reject ? `HARD REJECT: ${s.reject_reason || s.rationale}` : s.rationale;
         let niche;
         let insertCandidate = c;
-        if (track === "researcher") {
+        if (isIgResearcher) {
+          // Enriched IG candidate already has real followers/views — keep them
+          niche = (s.niche || []).slice(0, 3);
+        } else if (track === "researcher") {
           // Prefix the context so the card (which reads Rationale) shows role,
           // employer, grad year and country without new Notion columns.
           const ctx = [

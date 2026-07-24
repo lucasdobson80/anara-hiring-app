@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasApifyToken, getSpend, listAllRuns, getRunInput, getDatasetInfo, getRunRecord, getSetting, EST_USD_PER_RESULT } from "@/lib/apify";
+import { hasApifyToken, getSpend, listAllRuns, getRunInput, getDatasetInfo, getRunRecord, getSetting, EST_USD_PER_RESULT, IG_ACTOR_ID } from "@/lib/apify";
 import { hasAnthropicKey } from "@/lib/scoring";
 import { currentUser } from "@/lib/auth";
 
@@ -31,9 +31,13 @@ export async function GET(request) {
           r.defaultKeyValueStoreId ? getRunRecord(r.defaultKeyValueStoreId, "CASTING_DESK_CONFIG").catch(() => null) : null,
         ]);
         return {
+          // IG-actor runs without a launch config are Organic's sync scrapes,
+          // not sourcing runs — hide them from the list below.
+          hideRun: r.actId === IG_ACTOR_ID && !config,
           runOwner: config?.owner || "lucas",
           runTrack: config?.track || "creator",
           runPlatform: config?.platform || (config?.track === "researcher" ? "LinkedIn" : "TikTok"),
+          label: config?.label || null,
           id: r.id,
           status: r.status,
           startedAt: r.startedAt,
@@ -49,6 +53,7 @@ export async function GET(request) {
         };
       })
     );
+    runs = runs.filter((r) => !r.hideRun);
     // "Mine" shows only your runs; "All team" shows everyone's. Spend is shared.
     if (scope !== "all") runs = runs.filter((r) => r.runOwner === user);
     // When a track is given, only that track's runs (the shell watcher passes

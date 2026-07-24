@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import {
-  hasApifyToken, startRun, startResearcherRun, startUgcLinkedInRun, setRunRecord,
-  UGC_POOL, sampleUgcTags, getSetting, setSetting, COUNTRY_CODE,
+  hasApifyToken, startRun, startResearcherRun, startResearcherIgRuns, startUgcLinkedInRun,
+  setRunRecord, UGC_POOL, sampleUgcTags, getSetting, setSetting, COUNTRY_CODE, isIgReserved,
 } from "@/lib/apify";
+import { fetchAllCreators, normHandle } from "@/lib/notion";
 import { currentUser } from "@/lib/auth";
 
 const clamp = (v, lo, hi, dflt) => Math.min(Math.max(parseInt(v, 10) || dflt, lo), hi);
@@ -18,7 +19,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "bad-request", message: "Invalid JSON body." }, { status: 400 });
   }
 
-  // ── Researcher track: LinkedIn people-search (Laia's pharma/biotech/CRO) ──
+  // ── Researcher track: LinkedIn people-search + Instagram hunt (Laia) ──
   if (body.track === "researcher") {
     const roles = (body.roles || []).map((r) => String(r).trim()).filter(Boolean).slice(0, 15);
     const countries = (body.countries || []).map((c) => String(c).trim()).filter(Boolean).slice(0, 6);
@@ -28,14 +29,43 @@ export async function POST(request) {
     const maxItems = clamp(body.maxItems, 5, 1000, 100);
     const threshold = clamp(body.threshold, 60, 85, 70);
     const owner = await currentUser();
+
+    // Instagram: one click fires up to three discovery runs (account search,
+    // hashtag sweep, related-profiles crawl seeded from her existing IG finds)
+    if (body.platform === "Instagram") {
+      try {
+        const existing = await fetchAllCreators();
+        const seeds = existing
+          .filter((c) => (c.track || "creator") === "researcher" && c.platform === "Instagram"
+            && ["Approved", "Contacted", "Replied", "Interview", "Signed"].includes(c.status))
+          .map((c) => normHandle(c.handle))
+          .filter((h) => h && !isIgReserved(h))
+          .slice(0, 8);
+        const started = await startResearcherIgRuns({ roles, maxItems, seeds });
+        for (const { mode, label, run } of started) {
+          if (run.defaultKeyValueStoreId) {
+            await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
+              track: "researcher", platform: "Instagram", igMode: mode, label,
+              countries, threshold, owner,
+            }).catch(() => {});
+          }
+        }
+        return NextResponse.json({ runs: started.map(({ mode, run }) => ({ id: run.id, mode, status: run.status })) });
+      } catch (e) {
+        return NextResponse.json({ error: "apify", message: e.message }, { status: 502 });
+      }
+    }
+
     try {
       const run = await startResearcherRun({ roles, countries, activeRecently: Boolean(body.activeRecently), maxItems });
       if (run.defaultKeyValueStoreId) {
         await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
           track: "researcher", threshold, owner, roles, countries,
+          cursorKey: run.cursorKey, startPage: run.startPage,
+          label: `pages ${run.startPage}–${run.startPage + run.takePages - 1}`,
         }).catch(() => {});
       }
-      return NextResponse.json({ id: run.id, status: run.status });
+      return NextResponse.json({ id: run.id, status: run.status, startPage: run.startPage });
     } catch (e) {
       return NextResponse.json({ error: "apify", message: e.message }, { status: 502 });
     }

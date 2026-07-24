@@ -45,6 +45,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   const [rCountries, setRCountries] = useState(["United States", "United Kingdom"]);
   const [rActive, setRActive] = useState(false);
   const [rMax, setRMax] = useState(100);
+  const [rMaxIg, setRMaxIg] = useState(100);
   // Creator UGC form state (shared country selection, per-platform max)
   const [cCountries, setCCountries] = useState(["United States", "United Kingdom"]);
   const [cMaxTt, setCMaxTt] = useState(500);
@@ -135,6 +136,26 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   const rMaxN = Math.max(5, Math.min(1000, parseInt(rMax, 10) || 0));
   // ~1 search page per 25 results + full profile per result
   const rCost = (Math.ceil(rMaxN / 25) * LI_PER_PAGE + rMaxN * LI_PER_PROFILE).toFixed(2);
+  const rMaxIgN = Math.max(10, Math.min(500, parseInt(rMaxIg, 10) || 0));
+  // discovery posts/accounts + per-profile enrichment on import
+  const rIgCost = (rMaxIgN * 0.008).toFixed(2);
+
+  // Instagram fires up to three discovery runs from one click — the response
+  // carries a runs[] array rather than a single id.
+  const launchResearcherIg = async () => {
+    setLaunching(true); setImportResult(null);
+    try {
+      const res = await fetch("/api/source/run", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ track: "researcher", platform: "Instagram", roles: rRoles, countries: rCountries, maxItems: rMaxIgN, threshold }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      await loadStatus();
+    } catch (e) {
+      setError("Couldn't launch the runs: " + e.message);
+    } finally { setLaunching(false); }
+  };
 
   const launchResearcher = async () => {
     setLaunching(true); setImportResult(null);
@@ -231,12 +252,13 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       )}
 
       {track === "researcher" ? (
-        <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
-          <div className="eyebrow">New researcher run (LinkedIn)</div>
+      <>
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
+          <div className="eyebrow">Hunt researchers on LinkedIn</div>
           <p className="soft" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.55 }}>
             Searches LinkedIn for early-career people in these roles at pharma / biotech / CRO companies in the
             chosen countries. Senior titles, recruiters, and freelancers are filtered out; scoring judges the
-            rest (industry fit, grad year, how well they present themselves).
+            rest. Each search combination continues where it left off — re-run it weekly for fresh profiles.
           </p>
           {Object.entries(RESEARCHER_ROLE_GROUPS).map(([group, roles]) => (
             <div className="preset-row" key={group}>
@@ -273,10 +295,38 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
               scrape cost ~${rCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
             </span>
             <button className="primary" onClick={launchResearcher} disabled={launching || !rRoles.length || !rCountries.length}>
-              {launching ? "Launching…" : "Launch researcher run"}
+              {launching ? "Launching…" : "Launch LinkedIn run"}
             </button>
           </div>
         </div>
+
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
+          <div className="eyebrow">Hunt researchers on Instagram</div>
+          <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
+            One click fires three discovery runs: account search by your selected roles, a rotating sweep of
+            researcher hashtags, and accounts similar to your existing Instagram finds. Profiles are enriched
+            and scored on import; country is judged from the account (best effort, not a hard filter).
+          </p>
+          <div className="fields">
+            <label className="field">
+              <span>Max profiles</span>
+              <input className="input" type="number" value={rMaxIg} onChange={(e) => setRMaxIg(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Score bar (60–85)</span>
+              <input className="input" type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} />
+            </label>
+          </div>
+          <div className="launch-row">
+            <span className="soft" style={{ fontSize: 13 }}>
+              scrape cost ~${rIgCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
+            </span>
+            <button className="primary" onClick={launchResearcherIg} disabled={launching || !rRoles.length || !rCountries.length}>
+              {launching ? "Launching…" : "Launch Instagram runs"}
+            </button>
+          </div>
+        </div>
+      </>
       ) : (
       <>
         <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
@@ -379,15 +429,17 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
               <div className="run-line">
                 <span className={"badge run-" + r.status.toLowerCase()}>{r.status}</span>
                 <span className="mono soft">{fmtWhen(r.startedAt)}</span>
-                <span className="run-tags" title={(r.roles?.length ? r.roles : r.hashtags).join(", ")}>
+                <span className="run-tags" title={(r.roles?.length ? r.roles : r.hashtags).join(", ") || r.label || ""}>
                   {r.roles?.length
-                    ? r.roles.slice(0, 2).join(", ") + (r.roles.length > 2 ? ` +${r.roles.length - 2}` : "")
-                    : r.runPlatform === "LinkedIn"
-                      ? `UGC · LinkedIn${r.countries?.length ? " · " + r.countries.map((c) => CC_SHORT[c] || c).join(", ") : ""}`
-                      : r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "UGC · TikTok"}
+                    ? r.roles.slice(0, 2).join(", ") + (r.roles.length > 2 ? ` +${r.roles.length - 2}` : "") + (r.label ? ` · ${r.label}` : "")
+                    : r.label
+                      ? r.label
+                      : r.runPlatform === "LinkedIn"
+                        ? `UGC · LinkedIn${r.countries?.length ? " · " + r.countries.map((c) => CC_SHORT[c] || c).join(", ") : ""}`
+                        : r.hashtags.length ? "#" + r.hashtags.slice(0, 3).join(" #") + (r.hashtags.length > 3 ? ` +${r.hashtags.length - 3}` : "") : "UGC · TikTok"}
                 </span>
                 <span className="mono soft run-nums">
-                  {r.videos != null ? `${r.videos} ${r.runPlatform === "LinkedIn" ? "profiles" : "videos"}` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
+                  {r.videos != null ? `${r.videos} ${r.runPlatform === "LinkedIn" ? "profiles" : r.runPlatform === "Instagram" ? "items" : "videos"}` : ""} {r.usageUsd != null ? `· ${fmtUsd(r.usageUsd)}` : ""}
                 </span>
                 <button className="ghost tiny" title={archived[r.id] ? "Unarchive" : "Archive"} aria-label={archived[r.id] ? "Unarchive run" : "Archive run"} onClick={() => toggleArchived(r.id)}>
                   {archived[r.id] ? <IconUndo width={13} height={13} /> : <IconX width={13} height={13} />}
