@@ -253,28 +253,35 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
 
       {track === "researcher" ? (
       <>
-        <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
-          <div className="eyebrow">Hunt researchers on LinkedIn</div>
-          <p className="soft" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.55 }}>
-            Searches LinkedIn for early-career people in these roles at pharma / biotech / CRO companies in the
-            chosen countries. Senior titles, recruiters, and freelancers are filtered out; scoring judges the
-            rest. Each search combination continues where it left off — re-run it weekly for fresh profiles.
+        <div className="card" style={{ padding: "18px 22px", marginBottom: 14 }}>
+          <div className="eyebrow">Roles &amp; countries</div>
+          <p className="soft" style={{ fontSize: 12.5, margin: "6px 0 10px" }}>
+            Shared by both hunts below. Roles are exact job titles on LinkedIn · search keywords on Instagram.
           </p>
           {Object.entries(RESEARCHER_ROLE_GROUPS).map(([group, roles]) => (
-            <div className="preset-row" key={group}>
+            <div className="preset-row" key={group} style={{ marginTop: 8 }}>
               <span className="eyebrow" style={{ marginRight: 4 }}>{group}</span>
               {roles.map((role) => (
                 <button key={role} className={"chip" + (rRoles.includes(role) ? " on" : "")} onClick={() => toggleIn(setRRoles, rRoles, role)}>{role}</button>
               ))}
             </div>
           ))}
-          <div className="preset-row">
+          <div className="preset-row" style={{ marginTop: 8 }}>
             <span className="eyebrow" style={{ marginRight: 4 }}>Countries</span>
             {RESEARCHER_COUNTRIES.map((c) => (
               <button key={c} className={"chip" + (rCountries.includes(c) ? " on" : "")} onClick={() => toggleIn(setRCountries, rCountries, c)}>{c}</button>
             ))}
           </div>
-          <div className="preset-row">
+        </div>
+
+        <div className="card" style={{ padding: "20px 22px", marginBottom: 14 }}>
+          <div className="eyebrow">Hunt researchers on LinkedIn</div>
+          <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
+            Searches LinkedIn for early-career people in the selected roles at pharma / biotech / CRO companies.
+            Senior titles, recruiters, and freelancers are filtered out; scoring judges the rest. Each search
+            combination continues where it left off — re-run it weekly for fresh profiles.
+          </p>
+          <div className="preset-row" style={{ marginTop: 0 }}>
             <button className={"chip" + (rActive ? " on" : "")} onClick={() => setRActive((v) => !v)}>
               {rActive ? "✓ " : ""}Active on LinkedIn recently
             </button>
@@ -303,9 +310,9 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
         <div className="card" style={{ padding: "20px 22px", marginBottom: 16 }}>
           <div className="eyebrow">Hunt researchers on Instagram</div>
           <p className="soft" style={{ fontSize: 13, margin: "8px 0 12px", lineHeight: 1.55 }}>
-            One click fires three discovery runs: account search by your selected roles, a rotating sweep of
-            researcher hashtags, and accounts similar to your existing Instagram finds. Profiles are enriched
-            and scored on import; country is judged from the account (best effort, not a hard filter).
+            One click fires three discovery runs: account search using the roles selected above, a rotating
+            sweep of researcher hashtags, and accounts similar to your existing Instagram finds. Profiles are
+            enriched and scored on import; country is judged from the account (best effort, not a hard filter).
           </p>
           <div className="fields">
             <label className="field">
