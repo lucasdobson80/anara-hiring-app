@@ -74,6 +74,7 @@ export default function AnaraCastingDesk() {
   const [selected, setSelected] = useState(null);
   const [onboardSearch, setOnboardSearch] = useState("");
   const [onboardStage, setOnboardStage] = useState("All");
+  const [onboardPlatform, setOnboardPlatform] = useState(null); // null = all platforms
   const [showStale, setShowStale] = useState(false); // Contacted, no reply >2wk
   const [expandedStages, setExpandedStages] = useState({}); // stage -> show full list
   const [user, setUser] = useState(null);
@@ -591,6 +592,29 @@ export default function AnaraCastingDesk() {
                       {stageLabel(s)}
                     </button>
                   ))}
+                  {/* Platform filter: work one platform's onboarding at a time.
+                      Click the active chip again to go back to all platforms. */}
+                  <span style={{ width: 1, alignSelf: "stretch", background: "var(--border)", margin: "0 4px" }} aria-hidden />
+                  {["TikTok", "Instagram", "LinkedIn"].map((p) => {
+                    const Icon = PLATFORM_ICONS[p];
+                    return (
+                      <button
+                        key={p} className={"chip" + (onboardPlatform === p ? " on" : "")}
+                        title={onboardPlatform === p ? "Show all platforms" : `Only ${p}`}
+                        onClick={() => {
+                          const next = onboardPlatform === p ? null : p;
+                          setOnboardPlatform(next);
+                          setSelected((sel) => {
+                            if (!sel) return sel;
+                            const c = roster.find((r) => r.id === sel);
+                            return c && (!next || (c.platform || "TikTok") === next) ? sel : null;
+                          });
+                        }}
+                      >
+                        <Icon width={12} height={12} /> {p}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="onboard-grid">
                   <div className="roster">
@@ -599,6 +623,7 @@ export default function AnaraCastingDesk() {
                       const members = roster.filter(
                         (c) =>
                           stageOf(c) === stage &&
+                          (!onboardPlatform || (c.platform || "TikTok") === onboardPlatform) &&
                           (!q || (c.name || "").toLowerCase().includes(q) || (c.handle || "").toLowerCase().includes(q))
                       );
                       if (!members.length) return null;

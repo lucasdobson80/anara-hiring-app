@@ -52,7 +52,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   const [cMaxTt, setCMaxTt] = useState(500);
   const [cMaxLi, setCMaxLi] = useState(100);
   const [threshold, setThreshold] = useState(70);
-  const [launching, setLaunching] = useState(false);
+  const [launching, setLaunching] = useState(null); // null | "res-li" | "res-ig" | "ugc-tt" | "ugc-li"
   const [importing, setImporting] = useState(null); // runId
   const [importResult, setImportResult] = useState(null);
   const [lockedRuns, setLockedRuns] = useState({}); // runId -> true: import in progress elsewhere
@@ -123,7 +123,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   // One creator launcher for both hunting grounds — the run route branches on
   // the presence of `platform`.
   const launchCreator = async (platform) => {
-    setLaunching(true); setImportResult(null);
+    setLaunching(platform === "LinkedIn" ? "ugc-li" : "ugc-tt"); setImportResult(null);
     try {
       const body = platform === "LinkedIn"
         ? { platform: "LinkedIn", countries: cCountries, maxItems: cMaxLiN, threshold }
@@ -137,7 +137,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       await loadStatus();
     } catch (e) {
       setError("Couldn't launch the run: " + e.message);
-    } finally { setLaunching(false); }
+    } finally { setLaunching(null); }
   };
   const rMaxN = Math.max(5, Math.min(1000, parseInt(rMax, 10) || 0));
   // ~1 search page per 25 results + full profile per result
@@ -149,7 +149,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   // Instagram fires up to three discovery runs from one click — the response
   // carries a runs[] array rather than a single id.
   const launchResearcherIg = async () => {
-    setLaunching(true); setImportResult(null);
+    setLaunching("res-ig"); setImportResult(null);
     try {
       const res = await fetch("/api/source/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -160,11 +160,11 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       await loadStatus();
     } catch (e) {
       setError("Couldn't launch the runs: " + e.message);
-    } finally { setLaunching(false); }
+    } finally { setLaunching(null); }
   };
 
   const launchResearcher = async () => {
-    setLaunching(true); setImportResult(null);
+    setLaunching("res-li"); setImportResult(null);
     try {
       const res = await fetch("/api/source/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -175,7 +175,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
       await loadStatus();
     } catch (e) {
       setError("Couldn't launch the run: " + e.message);
-    } finally { setLaunching(false); }
+    } finally { setLaunching(null); }
   };
 
   const importRun = useCallback(async (runId, { force = false } = {}) => {
@@ -307,8 +307,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
             <span className="soft" style={{ fontSize: 13 }}>
               scrape cost ~${rCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
             </span>
-            <button className="primary" onClick={launchResearcher} disabled={launching || !rRoles.length || !rCountries.length}>
-              {launching ? "Launching…" : "Launch LinkedIn run"}
+            <button className="primary" onClick={launchResearcher} disabled={launching !== null || !rRoles.length || !rCountries.length}>
+              {launching === "res-li" ? "Launching…" : "Launch LinkedIn run"}
             </button>
           </div>
         </div>
@@ -334,8 +334,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
             <span className="soft" style={{ fontSize: 13 }}>
               scrape cost ~${rIgCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
             </span>
-            <button className="primary" onClick={launchResearcherIg} disabled={launching || !rRoles.length || !rCountries.length}>
-              {launching ? "Launching…" : "Launch Instagram runs"}
+            <button className="primary" onClick={launchResearcherIg} disabled={launching !== null || !rRoles.length || !rCountries.length}>
+              {launching === "res-ig" ? "Launching…" : "Launch Instagram runs"}
             </button>
           </div>
         </div>
@@ -374,8 +374,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
             <span className="soft" style={{ fontSize: 13 }}>
               scrape cost ~${ttCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
             </span>
-            <button className="primary" onClick={() => launchCreator("TikTok")} disabled={launching || !cCountries.length}>
-              {launching ? "Launching…" : "Launch TikTok run"}
+            <button className="primary" onClick={() => launchCreator("TikTok")} disabled={launching !== null || !cCountries.length}>
+              {launching === "ugc-tt" ? "Launching…" : "Launch TikTok run"}
             </button>
           </div>
         </div>
@@ -405,8 +405,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
             <span className="soft" style={{ fontSize: 13 }}>
               scrape cost ~${liCost} <span className="mono" style={{ fontSize: 11 }}>(estimate)</span> + a few cents of scoring
             </span>
-            <button className="primary" onClick={() => launchCreator("LinkedIn")} disabled={launching || !cCountries.length}>
-              {launching ? "Launching…" : "Launch LinkedIn run"}
+            <button className="primary" onClick={() => launchCreator("LinkedIn")} disabled={launching !== null || !cCountries.length}>
+              {launching === "ugc-li" ? "Launching…" : "Launch LinkedIn run"}
             </button>
           </div>
         </div>
