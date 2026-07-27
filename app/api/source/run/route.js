@@ -33,6 +33,10 @@ export async function POST(request) {
     // Instagram: one click fires up to three discovery runs (account search,
     // hashtag sweep, related-profiles crawl seeded from her existing IG finds)
     if (body.platform === "Instagram") {
+      // Follower band applied at import time, after profile enrichment (the
+      // only point where follower counts are known). Absent = wide open.
+      const minFollowers = Math.max(0, Math.min(1_000_000, parseInt(body.minFollowers, 10) || 0));
+      const maxFollowers = Math.max(minFollowers + 1, Math.min(10_000_000, parseInt(body.maxFollowers, 10) || 10_000_000));
       try {
         const existing = await fetchAllCreators();
         const seeds = existing
@@ -46,7 +50,7 @@ export async function POST(request) {
           if (run.defaultKeyValueStoreId) {
             await setRunRecord(run.defaultKeyValueStoreId, "CASTING_DESK_CONFIG", {
               track: "researcher", platform: "Instagram", igMode: mode, label,
-              countries, threshold, owner,
+              countries, threshold, owner, minFollowers, maxFollowers,
             }).catch(() => {});
           }
         }

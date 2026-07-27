@@ -47,6 +47,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   const [rActive, setRActive] = useState(false);
   const [rMax, setRMax] = useState(100);
   const [rMaxIg, setRMaxIg] = useState(100);
+  const [rIgMinF, setRIgMinF] = useState(200);
+  const [rIgMaxF, setRIgMaxF] = useState(200000);
   // Creator UGC form state (shared country selection, per-platform max)
   const [cCountries, setCCountries] = useState(["United States", "United Kingdom"]);
   const [cMaxTt, setCMaxTt] = useState(500);
@@ -143,6 +145,8 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
   // ~1 search page per 25 results + full profile per result
   const rCost = (Math.ceil(rMaxN / 25) * LI_PER_PAGE + rMaxN * LI_PER_PROFILE).toFixed(2);
   const rMaxIgN = Math.max(10, Math.min(500, parseInt(rMaxIg, 10) || 0));
+  const rIgMinFN = Math.max(0, Math.min(1_000_000, parseInt(rIgMinF, 10) || 0));
+  const rIgMaxFN = Math.max(rIgMinFN + 1, Math.min(10_000_000, parseInt(rIgMaxF, 10) || 0));
   // discovery posts/accounts + per-profile enrichment on import
   const rIgCost = (rMaxIgN * 0.008).toFixed(2);
 
@@ -153,7 +157,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
     try {
       const res = await fetch("/api/source/run", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ track: "researcher", platform: "Instagram", roles: rRoles, countries: rCountries, maxItems: rMaxIgN, threshold }),
+        body: JSON.stringify({ track: "researcher", platform: "Instagram", roles: rRoles, countries: rCountries, maxItems: rMaxIgN, minFollowers: rIgMinFN, maxFollowers: rIgMaxFN, threshold }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
@@ -324,6 +328,14 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
             <label className="field">
               <span>Max profiles</span>
               <input className="input" type="number" value={rMaxIg} onChange={(e) => setRMaxIg(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Min followers</span>
+              <input className="input" type="number" value={rIgMinF} onChange={(e) => setRIgMinF(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Max followers</span>
+              <input className="input" type="number" value={rIgMaxF} onChange={(e) => setRIgMaxF(e.target.value)} />
             </label>
             <label className="field">
               <span>Score bar (60–85)</span>

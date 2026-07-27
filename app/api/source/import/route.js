@@ -151,7 +151,12 @@ export async function POST(request) {
     if (isIgResearcher && batch.length) {
       const enriched = await runInstagram({ usernames: batch.map((c) => c.handle) });
       filtered.enrichFailed = (filtered.enrichFailed || 0) + (batch.length - enriched.length);
-      batch = enriched; // private/dead accounts drop out here
+      // Laia's follower band — appliable only now that profiles carry counts
+      const minF = config.minFollowers ?? 0;
+      const maxF = config.maxFollowers ?? 10_000_000;
+      const inBand = enriched.filter((c) => (c.followers ?? 0) >= minF && (c.followers ?? 0) <= maxF);
+      filtered.followerBand = (filtered.followerBand || 0) + (enriched.length - inBand.length);
+      batch = inBand; // private/dead accounts + out-of-band drop out here
     }
 
     // Progress for the run card's bar: how many of this run's fresh
