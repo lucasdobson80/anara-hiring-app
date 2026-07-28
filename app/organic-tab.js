@@ -21,8 +21,21 @@ export default function OrganicTab({ onImported, track = "creator" }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, track }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+      // Parse defensively: a dropped auth session (iOS PWA) or a platform
+      // error page answers with non-JSON, and Safari's res.json() would
+      // throw "The string did not match the expected pattern".
+      const raw = await res.text();
+      let data = null;
+      try { data = JSON.parse(raw); } catch {}
+      if (!res.ok) {
+        throw new Error(
+          data?.message ||
+          (res.status === 401
+            ? "Signed out — close and reopen the app to sign back in."
+            : `Server error (${res.status}) — try again in a moment.`)
+        );
+      }
+      if (!data) throw new Error(`Unexpected server response (${res.status}) — try again.`);
       setResult(data);
       setText("");
       onImported?.();

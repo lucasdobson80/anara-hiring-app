@@ -74,6 +74,17 @@ export function middleware(request) {
     }
   }
 
+  // API calls get a JSON 401 so client fetches can show a real message —
+  // iOS PWAs silently drop Basic-Auth sessions after backgrounding, and a
+  // plain-text body makes Safari's res.json() throw the cryptic "string did
+  // not match the expected pattern". Page loads keep the plain response so
+  // the browser's login prompt still appears.
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "auth", message: "Signed out — close and reopen the app to sign back in." },
+      { status: 401, headers: { "WWW-Authenticate": 'Basic realm="Anara Casting Desk"' } }
+    );
+  }
   return new NextResponse("Authentication required", {
     status: 401,
     headers: { "WWW-Authenticate": 'Basic realm="Anara Casting Desk"' },
