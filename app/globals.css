@@ -440,6 +440,18 @@ select.input { appearance: none; }
 
 .mobile-nav { display: none; }
 
+/* ── Public application form (/apply) ── */
+.apply-page { display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px calc(60px + env(safe-area-inset-bottom, 0px)); min-height: 100vh; }
+.apply-card { width: 100%; max-width: 520px; padding: 28px 26px 26px; }
+.apply-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.apply-brand .workspace-mark { cursor: default; }
+.apply-brand-name { font-weight: 700; font-size: 15px; }
+.apply-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.apply-sub { font-size: 13.5px; line-height: 1.6; margin: 0 0 18px; }
+.apply-form { display: flex; flex-direction: column; gap: 14px; }
+.apply-submit { padding: 12px 16px; font-size: 14.5px; margin-top: 2px; }
+@media (max-width: 480px) { .apply-page { padding-top: 18px; } .apply-card { padding: 22px 18px; } }
+
 @media (max-width: 900px) {
   .frame { grid-template-columns: 1fr; }
   .sidebar { display: none; }
