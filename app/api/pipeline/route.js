@@ -27,7 +27,8 @@ const MOCK = {
 
 export async function GET(request) {
   const user = await currentUser();
-  const track = new URL(request.url).searchParams.get("track") === "researcher" ? "researcher" : "creator";
+  const trackParam = new URL(request.url).searchParams.get("track");
+  const track = ["researcher", "partner"].includes(trackParam) ? trackParam : "creator";
   if (process.env.MOCK_PIPELINE === "1") {
     return NextResponse.json({ ...MOCK, user, team: TEAM });
   }

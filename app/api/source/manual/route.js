@@ -78,7 +78,7 @@ export async function POST(request) {
   }
 
   const owner = await currentUser();
-  const track = body.track === "researcher" ? "researcher" : "creator";
+  const track = ["researcher", "partner"].includes(body.track) ? body.track : "creator";
   try {
     const candidates = [];
 

@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   STAGES, ONBOARD_STAGES, LINKS,
-  firstNameOf, renderDm, DEFAULT_MESSAGES, mailtoLink, stageLabel, htmlToText, cleanEmailHtml,
+  firstNameOf, renderDm, renderPartner, partnerLink, PARTNER_SUBJECT, DEFAULT_MESSAGES, mailtoLink, stageLabel, stageLabelT, htmlToText, cleanEmailHtml,
   INTERVIEW_INTRO, INTERVIEW_CLOSE,
 } from "@/lib/templates";
 import SourceTab from "./source-tab";
 import OrganicTab from "./organic-tab";
 import HqTab from "./hq-tab";
 import MessagesTab from "./messages-tab";
-import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask, IconPanel, IconTikTok, IconInstagram, IconLinkedIn } from "./icons";
+import { IconX, IconCheck, IconExt, IconHome, IconSprout, IconUsers, IconSearch, IconInbox, IconMail, IconClapper, IconFlask, IconHandshake, IconGlobe, IconPanel, IconTikTok, IconInstagram, IconLinkedIn } from "./icons";
 
-const PLATFORM_ICONS = { TikTok: IconTikTok, Instagram: IconInstagram, LinkedIn: IconLinkedIn };
+const PLATFORM_ICONS = { TikTok: IconTikTok, Instagram: IconInstagram, LinkedIn: IconLinkedIn, Web: IconGlobe };
 
 // Top-bar page titles (the wordmark lives in the sidebar workspace block)
 const TAB_TITLES = { hq: "Overview", organic: "Organic", onboard: "Onboard", source: "Source", review: "Review", messages: "Messages" };
@@ -100,7 +100,7 @@ export default function AnaraCastingDesk() {
   // Review + Onboard show your OWN pipeline in the active track (team view
   // lives in HQ). Restore the remembered track before the first fetch.
   useEffect(() => {
-    try { const t = localStorage.getItem("cd_track"); if (t === "researcher" || t === "creator") setTrack(t); } catch {}
+    try { const t = localStorage.getItem("cd_track"); if (["researcher", "creator", "partner"].includes(t)) setTrack(t); } catch {}
   }, []);
 
   // Workspace logo (team-wide, stored in the settings KV store). Click the
@@ -187,6 +187,8 @@ export default function AnaraCastingDesk() {
     try { localStorage.setItem("cd_track", t); } catch {}
     setSelected(null);
     setPending({});
+    // Partners have no Source/Review — land on Onboard instead
+    if (t === "partner" && ["source", "review"].includes(tab)) setTab("onboard");
     setTrackFlash(t);
     setFlashClosing(false);
     flashStartRef.current = Date.now();
@@ -326,11 +328,13 @@ export default function AnaraCastingDesk() {
         <button className={tab === "organic" ? "tab on" : "tab"} title="Organic" onClick={() => setTab("organic")}>{icons && <IconSprout />}<span className="nav-label">Organic</span></button>
         <button className={tab === "onboard" ? "tab on" : "tab"} title="Onboard" onClick={() => setTab("onboard")}>{icons && <IconUsers />}<span className="nav-label">Onboard</span></button>
       </span>
+      {track !== "partner" && (
       <span className="tab-group">
         <span className="tab-group-label">FIND</span>
         <button className={tab === "source" ? "tab on" : "tab"} title="Source" onClick={() => setTab("source")}>{icons && <IconSearch />}<span className="nav-label">Source</span></button>
         <button className={tab === "review" ? "tab on" : "tab"} title="Review" onClick={() => setTab("review")}>{icons && <IconInbox />}<span className="nav-label">Review</span></button>
       </span>
+      )}
       <button className={tab === "messages" ? "tab on" : "tab"} title="Messages" onClick={() => setTab("messages")}>{icons && <IconMail />}<span className="nav-label">Messages</span></button>
     </>
   );
@@ -338,6 +342,7 @@ export default function AnaraCastingDesk() {
     <div className="track-switch">
       <button className={track === "creator" ? "on" : ""} title="UGC Creators" onClick={() => switchTrack("creator")}><IconClapper /> <span className="nav-label">UGC Creators</span></button>
       <button className={track === "researcher" ? "on" : ""} title="Researchers" onClick={() => switchTrack("researcher")}><IconFlask /> <span className="nav-label">Researchers</span></button>
+      <button className={track === "partner" ? "on" : ""} title="Partners" onClick={() => switchTrack("partner")}><IconHandshake /> <span className="nav-label">Partners</span></button>
     </div>
   );
 
@@ -364,6 +369,7 @@ export default function AnaraCastingDesk() {
           </button>
           <h1>{TAB_TITLES[tab] || "Overview"}</h1>
           {track === "researcher" && <span className="track-tag"><IconFlask width={12} height={12} /> Researchers</span>}
+          {track === "partner" && <span className="track-tag"><IconHandshake width={12} height={12} /> Partners</span>}
         </div>
         <div className="top-actions">
           <button className="ghost" onClick={() => load({ keepPending: pendingCount > 0 })} disabled={loading || syncing}>Reload</button>
@@ -386,8 +392,8 @@ export default function AnaraCastingDesk() {
       {trackFlash && (
         <div className={"track-flash" + (flashClosing ? " closing" : "")} role="status" aria-live="polite" onClick={dismissFlash} title="Click to dismiss">
           <div className="track-flash-inner">
-            {trackFlash === "researcher" ? <IconFlask width={30} height={30} /> : <IconClapper width={30} height={30} />}
-            <span>{trackFlash === "researcher" ? "Researchers" : "UGC Creators"}</span>
+            {trackFlash === "researcher" ? <IconFlask width={30} height={30} /> : trackFlash === "partner" ? <IconHandshake width={30} height={30} /> : <IconClapper width={30} height={30} />}
+            <span>{trackFlash === "researcher" ? "Researchers" : trackFlash === "partner" ? "Partners" : "UGC Creators"}</span>
             <span className="track-flash-hint soft">loading…</span>
           </div>
         </div>
@@ -409,10 +415,10 @@ export default function AnaraCastingDesk() {
           {renderTrackSwitch()}
           <nav className="side-nav" aria-label="Sections">{renderNav({ icons: true })}</nav>
           <div className="side-funnel">
-            <div className="eyebrow">{track === "researcher" ? "Researcher funnel" : "Funnel"}</div>
-            {displayCounts.filter(({ stage }) => stage !== "Approved" && stage !== "Rejected").map(({ stage, n }) => (
-              <div key={stage} className={"stage-row" + (stage === "New" ? " hot" : "")}>
-                <span>{stageLabel(stage)}</span><b>{n}</b>
+            <div className="eyebrow">{track === "researcher" ? "Researcher funnel" : track === "partner" ? "Partner funnel" : "Funnel"}</div>
+            {displayCounts.filter(({ stage }) => (track === "partner" ? stage !== "New" && stage !== "Rejected" : stage !== "Approved" && stage !== "Rejected")).map(({ stage, n }) => (
+              <div key={stage} className={"stage-row" + (stage === (track === "partner" ? "Approved" : "New") ? " hot" : "")}>
+                <span>{stageLabelT(stage, track)}</span><b>{n}</b>
               </div>
             ))}
           </div>
@@ -589,13 +595,13 @@ export default function AnaraCastingDesk() {
                         });
                       }}
                     >
-                      {stageLabel(s)}
+                      {stageLabelT(s, track)}
                     </button>
                   ))}
                   {/* Platform filter: work one platform's onboarding at a time.
                       Click the active chip again to go back to all platforms. */}
                   <span style={{ width: 1, alignSelf: "stretch", background: "var(--border)", margin: "0 4px" }} aria-hidden />
-                  {["TikTok", "Instagram", "LinkedIn"].map((p) => {
+                  {(track === "partner" ? ["TikTok", "Instagram", "LinkedIn", "Web"] : ["TikTok", "Instagram", "LinkedIn"]).map((p) => {
                     const Icon = PLATFORM_ICONS[p];
                     return (
                       <button
@@ -628,13 +634,13 @@ export default function AnaraCastingDesk() {
                       );
                       if (!members.length) return null;
                       const rowOf = (c) => {
-                        const prog = stage === "Signed" ? signProgress(c.id) : null;
+                        const prog = stage === "Signed" && track !== "partner" ? signProgress(c.id) : null;
                         return (
                           <button key={c.id} className={"roster-row" + (selected === c.id ? " on" : "")} onClick={() => setSelected(c.id)}>
                             <span className="rname">{c.name || c.handle}</span>
                             <span className="roster-tags">
                               {prog && <span className={"sign-badge" + (prog.done === prog.total ? " full" : "")}>{prog.done === prog.total ? "✓ set up" : `${prog.done}/${prog.total}`}</span>}
-                              <span className="badge">{stageLabel(stageOf(c))}</span>
+                              <span className="badge">{stageLabelT(stageOf(c), track)}</span>
                             </span>
                           </button>
                         );
@@ -677,7 +683,7 @@ export default function AnaraCastingDesk() {
                       }
                       return (
                         <div key={stage}>
-                          <div className="roster-head"><span>{stageLabel(stage)}</span><span>{members.length}</span></div>
+                          <div className="roster-head"><span>{stageLabelT(stage, track)}</span><span>{members.length}</span></div>
                           {capped(members).map(rowOf)}
                           {moreToggle(members.length)}
                         </div>
@@ -720,11 +726,11 @@ export default function AnaraCastingDesk() {
                                   {i > 0 && <span className={"sp-line" + (i <= spIdx ? " done" : "")} />}
                                   <button
                                     className={"sp-step" + (i < spIdx ? " done" : i === spIdx ? " now" : "")}
-                                    title={s === stage ? `Current stage: ${stageLabel(s)}` : `Move to ${stageLabel(s)}`}
+                                    title={s === stage ? `Current stage: ${stageLabelT(s, track)}` : `Move to ${stageLabelT(s, track)}`}
                                     onClick={() => s !== stage && moveStage(c, s)}
                                   >
                                     <span className="sp-dot">{i < spIdx ? <IconCheck width={9} height={9} /> : null}</span>
-                                    {stageLabel(s)}
+                                    {stageLabelT(s, track)}
                                   </button>
                                 </span>
                               ))}
@@ -732,7 +738,7 @@ export default function AnaraCastingDesk() {
                           )}
                           {(c.followers != null || c.score != null || c.dateSourced) && (
                             <div className="play-meta">
-                              {c.followers != null && <div className="pm-tile"><b className="mono">{fmt(c.followers)}</b><label>{platform === "LinkedIn" ? "Connections" : "Followers"}</label></div>}
+                              {c.followers != null && <div className="pm-tile"><b className="mono">{fmt(c.followers)}</b><label>{track === "partner" ? "Members / audience" : platform === "LinkedIn" ? "Connections" : "Followers"}</label></div>}
                               {platform !== "LinkedIn" && c.views != null && <div className="pm-tile"><b className="mono">{fmt(c.views)}</b><label>Sourced video views</label></div>}
                               {c.score != null && <div className="pm-tile"><b className="mono">{c.score}</b><label>Fit score</label></div>}
                               {c.dateSourced && <div className="pm-tile"><b className="mono">{shortDate(c.dateSourced)}</b><label>Sourced</label></div>}
@@ -761,6 +767,17 @@ export default function AnaraCastingDesk() {
                             </div>
                           ) : (
                             <>
+                              {track === "partner" ? (
+                              <PartnerPack
+                                stage={stage} c={c}
+                                ownerFirst={firstNameOf(((c.rationale || "").match(/Owner: ([^\u00b7]+)/) || [])[1]?.trim() || "")}
+                                link={partnerLink(c.name || c.handle)}
+                                messages={messages} copy={copy} copiedKey={copiedKey}
+                                bumpDays={(c.contactedAt || c.lastEdited) ? Math.floor((Date.now() - Date.parse(c.contactedAt || c.lastEdited)) / 86400000) : null}
+                                bumped={/follow-up bump sent/.test(c.notes || "")}
+                                onBump={() => markBumped(c)}
+                              />
+                              ) : (
                               <StagePack
                                 stage={stage} first={first} email={c.email}
                                 copy={copy} copyRich={copyRich} copiedKey={copiedKey} dmFor={dmFor}
@@ -776,6 +793,7 @@ export default function AnaraCastingDesk() {
                                 onSign={(next) => { writeSign(c.id, next); bumpSign(); }}
                                 onOnboarded={() => appendOnboardNote(c.id)}
                               />
+                              )}
                             </>
                           )}
                         </div>
@@ -803,6 +821,86 @@ export default function AnaraCastingDesk() {
     </div>
   );
 }
+
+// Partner (community-owner) playbooks: pitch → wait → close → post → live.
+// Every pack keeps the community's application link one click away.
+function PartnerPack({ stage, c, ownerFirst, link, messages, copy, copiedKey, bumpDays, bumped, onBump }) {
+  const vars = { name: ownerFirst || "there", community: c.name || "your community", link };
+  const C = ({ k, text, children }) => (
+    <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
+  );
+  const LinkBtn = <C k={"p-link-" + c.id} text={link}>Copy their application link</C>;
+
+  if (stage === "Approved") return (
+    <div className="pack">
+      <div className="eyebrow">Pitch the owner</div>
+      <p className="soft">
+        Send the pitch from your own account (DM) or inbox (email) — it leads with the base rate and
+        their personalised link. Once sent, move them to Contacted and Save.
+      </p>
+      <C k={"p-pdm-" + c.id} text={renderPartner(messages["Partner DM"], vars)}>Copy pitch DM</C>
+      {c.email && (
+        <a
+          className="res copybtn" style={{ display: "block" }}
+          href={mailtoLink(c.email, renderPartner(messages["Partner email"], vars), PARTNER_SUBJECT)}
+          target="_blank" rel="noreferrer"
+          onClick={() => copy("p-pem-" + c.id, renderPartner(messages["Partner email"], vars))}
+        >
+          {copiedKey === "p-pem-" + c.id ? "Email opened · pitch copied ✓" : `Email ${c.email} + copy pitch`}
+        </a>
+      )}
+      {LinkBtn}
+    </div>
+  );
+  if (stage === "Contacted") return (
+    <div className="pack">
+      <div className="eyebrow">Waiting on the owner</div>
+      <p className="soft">
+        When they reply, move to Replied. If nothing after ~5 days, one polite bump, then let it go.
+        {bumpDays != null && <> Contacted <b>{bumpDays}d ago</b>.</>}{bumped && " A bump was already sent."}
+      </p>
+      <button className="res copybtn" onClick={() => { copy("p-pbump-" + c.id, renderDm(messages["Follow-up bump"], vars.name)); onBump?.(); }}>
+        {copiedKey === "p-pbump-" + c.id ? "Copied ✓" : "Copy bump message"}
+      </button>
+      {LinkBtn}
+    </div>
+  );
+  if (stage === "Replied") return (
+    <div className="pack">
+      <div className="eyebrow">Close it</div>
+      <p className="soft">
+        Answer their questions and offer a quick call. The pitch: real paid work for their members,
+        applications through their link get priority review, zero effort for them beyond one post.
+        When they agree to share it, move to Agreed.
+      </p>
+      {LinkBtn}
+    </div>
+  );
+  if (stage === "Interview") return (
+    <div className="pack">
+      <div className="eyebrow">Agreed — make posting effortless</div>
+      <p className="soft">
+        Send them a ready-to-paste blurb so sharing takes zero thought. Once it&apos;s live in their
+        community, move to Posted.
+      </p>
+      <C k={"p-blurb-" + c.id} text={renderPartner(messages["Partner post blurb"], vars)}>Copy post blurb for their community</C>
+      {LinkBtn}
+    </div>
+  );
+  if (stage === "Signed") return (
+    <div className="pack">
+      <div className="eyebrow">Posted — applications incoming</div>
+      <p className="soft">
+        Every application through their link lands in your creator Review queue stamped with{" "}
+        <b>{communityTag(link)}</b>, and you get an email per signup. Check in with the owner after a
+        few days — a thank-you goes a long way, and ask which other community owners they rate.
+      </p>
+      {LinkBtn}
+    </div>
+  );
+  return null;
+}
+const communityTag = (link) => { try { return new URL(link).searchParams.get("c") || "their community name"; } catch { return "their community name"; } };
 
 function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump, bumpDays, bumped, onBump, welcomeHtml, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;

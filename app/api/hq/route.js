@@ -85,7 +85,7 @@ export async function GET(request) {
   const period = ["day", "week", "month"].includes(url.searchParams.get("period")) ? url.searchParams.get("period") : "week";
   const offset = Math.max(-260, Math.min(0, parseInt(url.searchParams.get("offset"), 10) || 0));
   const scope = url.searchParams.get("scope") === "all" ? "all" : "mine";
-  const track = url.searchParams.get("track") === "researcher" ? "researcher" : "creator";
+  const track = ["researcher", "partner"].includes(url.searchParams.get("track")) ? url.searchParams.get("track") : "creator";
 
   if (!process.env.NOTION_TOKEN) {
     return NextResponse.json({ error: "setup", message: "NOTION_TOKEN is not set." }, { status: 503 });

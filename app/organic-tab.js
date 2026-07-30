@@ -48,7 +48,14 @@ export default function OrganicTab({ onImported, track = "creator" }) {
     <div>
       <div className="card" style={{ padding: "20px 22px", marginBottom: 18 }}>
         <div className="eyebrow">Add from organic scrolling</div>
-        {track === "researcher" ? (
+        {track === "partner" ? (
+          <p className="soft" style={{ fontSize: 13.5, margin: "8px 0 0", lineHeight: 1.6 }}>
+            Paste the community owner&apos;s <b>profile link</b> (TikTok, Instagram, or LinkedIn) or
+            @handle — one per community, up to 30 per batch. They land in <b>Onboard as Found</b>,
+            ready to pitch. Tip: after adding, put the community name in the row&apos;s Name field in
+            Notion so the playbook can build their application link.
+          </p>
+        ) : track === "researcher" ? (
           <p className="soft" style={{ fontSize: 13.5, margin: "8px 0 0", lineHeight: 1.6 }}>
             Paste <b>LinkedIn profile links</b> for researchers you found by hand (up to 30 per batch,
             separated by new lines, spaces, or commas). They&apos;re added <b>instantly</b> as tracked

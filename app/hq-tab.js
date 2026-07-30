@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { stageLabel } from "@/lib/templates";
+import { stageLabel, stageLabelT } from "@/lib/templates";
 
 // The tracking hub — the only team-wide surface. Shortimize-style overview:
 // a KPI tile row that doubles as the chart's metric selector, a hero area
@@ -194,7 +194,7 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
   const signed = data?.signed || 0;
   const pct = Math.min(100, Math.round((signed / goal) * 100));
   const rel = REL[period]?.[String(offset)];
-  const metricLabel = stageLabel(FUNNEL.find(([k]) => k === metric)?.[1] || "Contacted");
+  const metricLabel = stageLabelT(FUNNEL.find(([k]) => k === metric)?.[1] || "Contacted", track);
 
   return (
     <div>
@@ -233,8 +233,8 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
           {/* KPI tiles: goal first, then one tile per stage — clicking a
               stage tile points the chart below at that metric. */}
           <div className="kpi-row">
-            {/* Researchers have no goal — Laia's track tracks activity only */}
-            {track !== "researcher" && (
+            {/* Only the creator track carries a signing goal */}
+            {track === "creator" && (
               <div className="kpi goal">
                 <div className="kpi-label">{scope === "all" ? "Team goal" : "My goal"} · {rel || data?.label || ""}</div>
                 <div className="kpi-num">{signed} <span className="kpi-sub">/ {goal} onboarded</span></div>
@@ -248,7 +248,7 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
             )}
             {FUNNEL.map(([k, label]) => (
               <button key={k} className={"kpi kpi-btn" + (metric === k ? " sel" : "")} onClick={() => setMetric(k)}>
-                <div className="kpi-label">{stageLabel(label)}</div>
+                <div className="kpi-label">{stageLabelT(label, track)}</div>
                 <div className="kpi-num">{f[k] || 0}</div>
               </button>
             ))}
@@ -269,7 +269,7 @@ export default function HqTab({ user: initialUser, team: initialTeam, track = "c
               <div className="hq-acct-scroll">
                 <div className="hq-acct hq-acct-head">
                   <span></span>
-                  {FUNNEL.map(([k, label]) => <span key={k} style={{ textAlign: "right" }}>{stageLabel(label)}</span>)}
+                  {FUNNEL.map(([k, label]) => <span key={k} style={{ textAlign: "right" }}>{stageLabelT(label, track)}</span>)}
                 </div>
                 {team.map((m) => (
                   <div key={m} className={"hq-acct" + (m === me ? " me" : "")}>
