@@ -41,6 +41,8 @@ export async function POST(request) {
   const email = String(body.email || "").trim().slice(0, 120);
   const portfolio = String(body.portfolio || "").trim().slice(0, 200);
   const country = String(body.country || "").trim().slice(0, 40);
+  const AUDIENCES = ["College students", "Researchers & postgrads", "Don't mind"];
+  const audience = AUDIENCES.includes(body.audience) ? body.audience : null;
   const community = String(body.community || "").trim().slice(0, 60).replace(/[^\w\s\-.]/g, "");
   const profile = parseProfile(body.link);
 
@@ -55,6 +57,7 @@ export async function POST(request) {
     }
     const rationale = [
       `📥 Applied via ${community || "intake form"}`,
+      audience && audience !== "Don't mind" ? `prefers ${audience.toLowerCase()}` : null,
       country || null,
       portfolio ? `portfolio: ${portfolio}` : null,
     ].filter(Boolean).join(" · ");

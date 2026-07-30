@@ -449,6 +449,7 @@ select.input { appearance: none; }
 .apply-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
 .apply-sub { font-size: 13.5px; line-height: 1.6; margin: 0 0 18px; }
 .apply-form { display: flex; flex-direction: column; gap: 14px; }
+.apply-choices { display: flex; gap: 6px; flex-wrap: wrap; }
 .apply-submit { padding: 12px 16px; font-size: 14.5px; margin-top: 2px; }
 @media (max-width: 480px) { .apply-page { padding-top: 18px; } .apply-card { padding: 22px 18px; } }
 
