@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createCreator, handleExists } from "@/lib/notion";
+import { sendNotificationEmail } from "@/lib/apify";
 
 export const dynamic = "force-dynamic";
 
@@ -50,9 +51,35 @@ export async function POST(request) {
   if (!EMAIL_RX.test(email)) return NextResponse.json({ error: "bad-request", message: "Please enter a valid email." }, { status: 400 });
   if (!profile) return NextResponse.json({ error: "bad-request", message: "Please paste your TikTok or Instagram profile link (or @handle)." }, { status: 400 });
 
+  // Notify Lucas on every application (awaited so serverless doesn't kill
+  // it, but a mail hiccup must never fail the applicant's submission)
+  const notify = async (headline) => {
+    try {
+      await sendNotificationEmail({
+        subject: `${headline}: ${name} (@${profile.handle})`,
+        text: [
+          headline,
+          "",
+          `Name: ${name}`,
+          `Profile: ${profile.profileUrl}`,
+          `Platform: ${profile.platform}`,
+          `Email: ${email}`,
+          audience ? `Prefers: ${audience}` : null,
+          country ? `Country: ${country}` : null,
+          portfolio ? `Portfolio: ${portfolio}` : null,
+          `Community: ${community || "(direct link)"}`,
+          "",
+          "Review: https://anara-casting-desk.vercel.app",
+        ].filter(Boolean).join("\n"),
+      });
+    } catch {}
+  };
+
   try {
     if (await handleExists(profile.handle, profile.platform)) {
-      // Known handle (any stage, incl. screened) — friendly, no duplicate row
+      // Known handle (any stage, incl. screened) — friendly, no duplicate
+      // row, but still worth knowing: a screened person applying is a signal
+      await notify("Application from someone already in the pipeline");
       return NextResponse.json({ ok: true, alreadyKnown: true });
     }
     const rationale = [
@@ -76,6 +103,7 @@ export async function POST(request) {
       },
       "New", "lucas", "creator"
     );
+    await notify("New UGC application");
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: "notion", message: "Something went wrong — please try again." }, { status: 502 });
