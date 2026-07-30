@@ -71,6 +71,10 @@ export default function ApplyPage() {
               week after week, with bonuses when videos take off. Tell us where to find your work
               and we&apos;ll be in touch.
             </p>
+            {/* Community-shared links (?c=) lead with the money */}
+            {community && (
+              <p className="apply-pay">💸 Base rate: <b>$1,000–$2,000 per month</b></p>
+            )}
             <form onSubmit={submit} className="apply-form">
               <label className="field">
                 <span>Your name</span>
