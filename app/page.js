@@ -95,7 +95,7 @@ export default function AnaraCastingDesk() {
     fetch("/api/settings/messages").then((r) => r.json()).then((d) => { if (d.messages) setMessages(d.messages); }).catch(() => {});
   }, []);
   const dmFor = useCallback((first) => renderDm(messages["Outreach DM"], first), [messages]);
-  const welcomeFor = useCallback((first) => renderDm(messages["Welcome email"], first), [messages]);
+  const welcomeFor = useCallback((first) => renderDm(messages["Welcome email (postgrad)"], first), [messages]);
 
   // Review + Onboard show your OWN pipeline in the active track (team view
   // lives in HQ). Restore the remembered track before the first fetch.
@@ -786,11 +786,11 @@ export default function AnaraCastingDesk() {
                                 bumped={/follow-up bump sent/.test(c.notes || "")}
                                 onBump={() => markBumped(c)}
                                 welcomeHtml={welcomeFor(first)}
-                                welcomeHtmlPost={renderDm(messages["Welcome email (postgrad)"], first)}
+                                welcomeHtmlUnder={renderDm(messages["Welcome email (undergrad)"], first)}
                                 welcomeMsg={renderDm(messages["Welcome message"], first)}
                                 contractLink={messages["Contract template link"]}
-                                trialLink={messages["Trial videos link"]}
-                                trialLinkPost={messages["Trial videos link (postgrad)"]}
+                                trialLink={messages["Trial videos link (postgrad)"]}
+                                trialLinkUnder={messages["Trial videos link (undergrad)"]}
                                 signState={readSign(c.id)}
                                 onSign={(next) => { writeSign(c.id, next); bumpSign(); }}
                                 onOnboarded={(team) => appendOnboardNote(c.id, team)}
@@ -904,7 +904,7 @@ function PartnerPack({ stage, c, ownerFirst, link, messages, copy, copiedKey, bu
 }
 const communityTag = (link) => { try { return new URL(link).searchParams.get("c") || "their community name"; } catch { return "their community name"; } };
 
-function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump, bumpDays, bumped, onBump, welcomeHtml, welcomeHtmlPost, welcomeMsg, contractLink, trialLink, trialLinkPost, signState, onSign, onOnboarded }) {
+function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump, bumpDays, bumped, onBump, welcomeHtml, welcomeHtmlUnder, welcomeMsg, contractLink, trialLink, trialLinkUnder, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -958,9 +958,11 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
   const s = signState || {};
   // Which team they're joining decides the welcome email (different
   // presentation) and the trial videos link. Persisted with wizard state.
-  const team = s.team === "postgrad" ? "postgrad" : "undergrad";
-  const wHtml = team === "postgrad" ? welcomeHtmlPost : welcomeHtml;
-  const tLink = team === "postgrad" ? trialLinkPost : trialLink;
+  // Default postgrad — that's the pre-split workflow all current creators
+  // came through; undergrad is the new team.
+  const team = s.team === "undergrad" ? "undergrad" : "postgrad";
+  const wHtml = team === "undergrad" ? welcomeHtmlUnder : welcomeHtml;
+  const tLink = team === "undergrad" ? trialLinkUnder : trialLink;
   const steps = [
     { key: "contract", label: "Contract", body: (<>
       <L href={contractLink || LINKS.contractTemplate}>Contract template</L>
@@ -972,14 +974,14 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
     { key: "groupchats", label: "Group chats", body: (<>
       <C k="p-igmsg" text={welcomeMsg}>Copy welcome message</C>
       {tLink
-        ? <C k="p-trial" text={tLink}>Copy Trial videos link{team === "postgrad" ? " (postgrad)" : ""}</C>
-        : <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Set the {team === "postgrad" ? "postgrad " : ""}Trial videos link in Messages</p>}
+        ? <C k="p-trial" text={tLink}>Copy Trial videos link ({team})</C>
+        : <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Set the {team} Trial videos link in Messages</p>}
       <C k="p-celeb" text={LINKS.celebrationsChat}>Copy Celebrations chat link</C>
       <C k="p-announce" text={LINKS.announcementsChat}>Copy Announcements chat link</C>
     </>) },
     { key: "email", label: "Welcome email", body: (<>
       <button className="res copybtn" onClick={() => copyRich("p-email", cleanEmailHtml(wHtml), htmlToText(wHtml))}>
-        {copiedKey === "p-email" ? "Copied ✓ — paste into Gmail" : `Copy welcome email${team === "postgrad" ? " (postgrad)" : ""}`}
+        {copiedKey === "p-email" ? "Copied ✓ — paste into Gmail" : `Copy welcome email (${team})`}
       </button>
       {email && <L href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`}>Open Gmail to {email}</L>}
       <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Add the subject &amp; CC yourself, then paste (Cmd/Ctrl+V) — links &amp; bullets are kept.</p>
@@ -993,9 +995,9 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
       <div className="eyebrow">Onboarded — finish setup ({done}/{steps.length})</div>
       <div className="preset-row" style={{ marginTop: 0 }}>
         <span className="eyebrow" style={{ marginRight: 4 }}>Team</span>
-        {["undergrad", "postgrad"].map((t) => (
+        {["postgrad", "undergrad"].map((t) => (
           <button key={t} className={"chip" + (team === t ? " on" : "")} onClick={() => onSign({ ...s, team: t })}>
-            {t === "undergrad" ? "Undergrad team" : "Postgrad team"}
+            {t === "postgrad" ? "Postgrad team" : "Undergrad team"}
           </button>
         ))}
       </div>

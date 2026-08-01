@@ -22,6 +22,14 @@ export async function GET() {
       const legacy = await getRunRecord(storeId, `DM_TEMPLATE_${user}`).catch(() => null);
       stored = legacy?.template ? { "Outreach DM": legacy.template } : {};
     }
+    // Migration (31 Jul 2026): the pre-split messages were the POSTGRAD set —
+    // carry customized content under the new explicit names.
+    if (stored["Welcome email"] && !stored["Welcome email (postgrad)"]) {
+      stored["Welcome email (postgrad)"] = stored["Welcome email"];
+    }
+    if (stored["Trial videos link"] && !stored["Trial videos link (postgrad)"]) {
+      stored["Trial videos link (postgrad)"] = stored["Trial videos link"];
+    }
     return NextResponse.json({ messages: { ...DEFAULT_MESSAGES, ...stored }, user });
   } catch {
     return NextResponse.json({ messages: DEFAULT_MESSAGES, user });
