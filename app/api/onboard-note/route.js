@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 // follow-up bump is sent (feeds the needs-a-bump queue).
 const NOTES = {
   onboarded: "onboarding completed",
+  "onboarded-undergrad": "onboarding completed · undergrad team",
+  "onboarded-postgrad": "onboarding completed · postgrad team",
   bump: "follow-up bump sent",
 };
 

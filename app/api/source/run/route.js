@@ -102,10 +102,13 @@ export async function POST(request) {
 
   // TikTok UGC hashtag scrape. Fixed pool, sample 8 (avoiding last run's set),
   // proxy-biased to a random selected country. Follower band is dead (ugcOnly).
-  const maxItems = clamp(body.maxItems, 10, 1500, 500);
+  // The actor caps ~100 results per hashtag, so volume scales with TAG COUNT:
+  // 8 tags for small runs up to 14 for big ones (pool of 19 still rotates).
+  const maxItems = clamp(body.maxItems, 10, 1400, 500);
   try {
     const last = (await getSetting("TT_UGC_LAST_TAGS")) || {};
-    const hashtags = sampleUgcTags(last.tags || [], 8);
+    const tagCount = Math.min(14, Math.max(8, Math.ceil(maxItems / 100)));
+    const hashtags = sampleUgcTags(last.tags || [], tagCount);
     const resultsPerPage = Math.min(100, Math.ceil(maxItems / hashtags.length));
     const proxyCountryCode = countryCodes[Math.floor(Math.random() * countryCodes.length)];
     const run = await startRun({ hashtags, resultsPerPage, days: 30, maxItems, proxyCountryCode });

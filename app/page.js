@@ -293,11 +293,11 @@ export default function AnaraCastingDesk() {
       body: JSON.stringify({ pageId: c.id, kind: "bump" }),
     }).catch(() => {});
   };
-  const appendOnboardNote = async (id) => {
+  const appendOnboardNote = async (id, team) => {
     try {
       await fetch("/api/onboard-note", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageId: id }),
+        body: JSON.stringify({ pageId: id, kind: team === "postgrad" ? "onboarded-postgrad" : "onboarded-undergrad" }),
       });
     } catch { /* best-effort — the checklist state is the source of truth */ }
   };
@@ -786,12 +786,14 @@ export default function AnaraCastingDesk() {
                                 bumped={/follow-up bump sent/.test(c.notes || "")}
                                 onBump={() => markBumped(c)}
                                 welcomeHtml={welcomeFor(first)}
+                                welcomeHtmlPost={renderDm(messages["Welcome email (postgrad)"], first)}
                                 welcomeMsg={renderDm(messages["Welcome message"], first)}
                                 contractLink={messages["Contract template link"]}
                                 trialLink={messages["Trial videos link"]}
+                                trialLinkPost={messages["Trial videos link (postgrad)"]}
                                 signState={readSign(c.id)}
                                 onSign={(next) => { writeSign(c.id, next); bumpSign(); }}
-                                onOnboarded={() => appendOnboardNote(c.id)}
+                                onOnboarded={(team) => appendOnboardNote(c.id, team)}
                               />
                               )}
                             </>
@@ -902,7 +904,7 @@ function PartnerPack({ stage, c, ownerFirst, link, messages, copy, copiedKey, bu
 }
 const communityTag = (link) => { try { return new URL(link).searchParams.get("c") || "their community name"; } catch { return "their community name"; } };
 
-function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump, bumpDays, bumped, onBump, welcomeHtml, welcomeMsg, contractLink, trialLink, signState, onSign, onOnboarded }) {
+function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump, bumpDays, bumped, onBump, welcomeHtml, welcomeHtmlPost, welcomeMsg, contractLink, trialLink, trialLinkPost, signState, onSign, onOnboarded }) {
   const L = ({ href, children }) => <a className="res" href={href} target="_blank" rel="noreferrer">{children} <IconExt width={12} height={12} /></a>;
   const C = ({ k, text, children }) => (
     <button className="res copybtn" onClick={() => copy(k, text)}>{copiedKey === k ? "Copied ✓" : children}</button>
@@ -954,6 +956,11 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
   // Signed: the onboarding wizard — tick each step as you go; state persists
   // per creator so you can be interrupted and pick up exactly where you left.
   const s = signState || {};
+  // Which team they're joining decides the welcome email (different
+  // presentation) and the trial videos link. Persisted with wizard state.
+  const team = s.team === "postgrad" ? "postgrad" : "undergrad";
+  const wHtml = team === "postgrad" ? welcomeHtmlPost : welcomeHtml;
+  const tLink = team === "postgrad" ? trialLinkPost : trialLink;
   const steps = [
     { key: "contract", label: "Contract", body: (<>
       <L href={contractLink || LINKS.contractTemplate}>Contract template</L>
@@ -964,15 +971,15 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
     </>) },
     { key: "groupchats", label: "Group chats", body: (<>
       <C k="p-igmsg" text={welcomeMsg}>Copy welcome message</C>
-      {trialLink
-        ? <C k="p-trial" text={trialLink}>Copy Trial videos link</C>
-        : <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Set the Trial videos link in Messages</p>}
+      {tLink
+        ? <C k="p-trial" text={tLink}>Copy Trial videos link{team === "postgrad" ? " (postgrad)" : ""}</C>
+        : <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Set the {team === "postgrad" ? "postgrad " : ""}Trial videos link in Messages</p>}
       <C k="p-celeb" text={LINKS.celebrationsChat}>Copy Celebrations chat link</C>
       <C k="p-announce" text={LINKS.announcementsChat}>Copy Announcements chat link</C>
     </>) },
     { key: "email", label: "Welcome email", body: (<>
-      <button className="res copybtn" onClick={() => copyRich("p-email", cleanEmailHtml(welcomeHtml), htmlToText(welcomeHtml))}>
-        {copiedKey === "p-email" ? "Copied ✓ — paste into Gmail" : "Copy welcome email"}
+      <button className="res copybtn" onClick={() => copyRich("p-email", cleanEmailHtml(wHtml), htmlToText(wHtml))}>
+        {copiedKey === "p-email" ? "Copied ✓ — paste into Gmail" : `Copy welcome email${team === "postgrad" ? " (postgrad)" : ""}`}
       </button>
       {email && <L href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`}>Open Gmail to {email}</L>}
       <p className="soft" style={{ margin: "2px 0", fontSize: 12.5 }}>Add the subject &amp; CC yourself, then paste (Cmd/Ctrl+V) — links &amp; bullets are kept.</p>
@@ -984,6 +991,14 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
   return (
     <div className="pack">
       <div className="eyebrow">Onboarded — finish setup ({done}/{steps.length})</div>
+      <div className="preset-row" style={{ marginTop: 0 }}>
+        <span className="eyebrow" style={{ marginRight: 4 }}>Team</span>
+        {["undergrad", "postgrad"].map((t) => (
+          <button key={t} className={"chip" + (team === t ? " on" : "")} onClick={() => onSign({ ...s, team: t })}>
+            {t === "undergrad" ? "Undergrad team" : "Postgrad team"}
+          </button>
+        ))}
+      </div>
       {steps.map((st, i) => (
         <div key={st.key} className={"sign-step" + (s[st.key] ? " done" : "")}>
           <button className="sign-check" onClick={() => toggle(st.key)} aria-label={s[st.key] ? "Mark incomplete" : "Mark done"}>
@@ -999,8 +1014,8 @@ function StagePack({ stage, first, email, copy, copyRich, copiedKey, dmFor, bump
         s.doneNoted ? (
           <p className="soft" style={{ color: "var(--ok)" }}>✓ Fully onboarded — logged to their Notion page. They join the weekly Tuesday meeting after trial week.</p>
         ) : (
-          <button className="primary" style={{ marginTop: 4 }} onClick={() => { onOnboarded(); onSign({ ...s, doneNoted: true }); }}>
-            ✓ Mark fully onboarded
+          <button className="primary" style={{ marginTop: 4 }} onClick={() => { onOnboarded(team); onSign({ ...s, doneNoted: true }); }}>
+            ✓ Mark fully onboarded · {team} team
           </button>
         )
       )}

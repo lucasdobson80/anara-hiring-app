@@ -117,7 +117,7 @@ export default function SourceTab({ onImported, scope = "mine", track = "creator
 
   const toggleIn = (setter, list, val) => setter(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
   // Creator UGC cost estimates
-  const cMaxTtN = Math.max(10, Math.min(1500, parseInt(cMaxTt, 10) || 0));
+  const cMaxTtN = Math.max(10, Math.min(1400, parseInt(cMaxTt, 10) || 0));
   const cMaxLiN = Math.max(5, Math.min(1000, parseInt(cMaxLi, 10) || 0));
   const ttCost = (cMaxTtN * TT_PER_RESULT).toFixed(2);
   const liCost = (Math.ceil(cMaxLiN / 25) * LI_PER_PAGE + cMaxLiN * LI_PER_PROFILE).toFixed(2);
