@@ -32,7 +32,10 @@ export async function GET() {
     }
     return NextResponse.json({ messages: { ...DEFAULT_MESSAGES, ...stored }, user });
   } catch {
-    return NextResponse.json({ messages: DEFAULT_MESSAGES, user });
+    // Store unreachable (e.g. Apify billing lock): serve defaults but SAY SO,
+    // so the client can block saves — otherwise a save would overwrite the
+    // user's stored bank with defaults.
+    return NextResponse.json({ messages: DEFAULT_MESSAGES, user, degraded: true });
   }
 }
 

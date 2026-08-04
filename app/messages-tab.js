@@ -39,7 +39,7 @@ function RichField({ html, onChange }) {
 // wherever these are used in Review / Onboard. Entries whose name ends in
 // "link" are single URLs.
 
-export default function MessagesTab({ messages, onSaved, user, copy, copyRich, copiedKey }) {
+export default function MessagesTab({ messages, degraded = false, onSaved, user, copy, copyRich, copiedKey }) {
   const [drafts, setDrafts] = useState(messages || DEFAULT_MESSAGES);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -50,6 +50,9 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
   useEffect(() => { if (messages) { setDrafts(messages); setRichKey((k) => k + 1); } }, [messages]);
 
   const save = async (justSaved) => {
+    // Never save while the bank was loaded from defaults (store unreachable)
+    // — it would overwrite the real stored bank with defaults.
+    if (degraded) { setErr("Storage is unreachable right now — saving is paused so your saved messages can't be overwritten. Reload once Apify is back."); return; }
     setSaving(true); setErr(null);
     try {
       // Only persist the fixed set — drop stray legacy keys, clean rich HTML
@@ -119,7 +122,7 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
           />
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-          <button className="primary small" onClick={() => save(name)} disabled={saving}>
+          <button className="primary small" onClick={() => save(name)} disabled={saving || degraded}>
             {saving ? "Saving…" : savedName === name ? "Saved ✓" : "Save"}
           </button>
         </div>
@@ -131,6 +134,12 @@ export default function MessagesTab({ messages, onSaved, user, copy, copyRich, c
     <div className="messages-tab">
       <div className="card" style={{ padding: "18px 22px", marginBottom: 16 }}>
         <div className="eyebrow">My message bank ({user || "me"})</div>
+        {degraded && (
+          <div className="banner bad" style={{ borderRadius: 9, margin: "10px 0 0" }}>
+            Showing DEFAULT messages — storage is unreachable (check Apify billing). Your saved
+            messages are safe; saving is paused so they can&apos;t be overwritten. Reload once it&apos;s back.
+          </div>
+        )}
         <p className="soft" style={{ fontSize: 13, margin: "8px 0 0", lineHeight: 1.55 }}>
           Your personal outreach &amp; onboarding copy. Write <span className="mono">{"{first}"}</span> wherever
           the creator&apos;s first name should appear (becomes &quot;there&quot; when unknown). These are what the

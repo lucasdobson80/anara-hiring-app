@@ -91,8 +91,12 @@ export default function AnaraCastingDesk() {
   // Personal message bank ({first} token) — the Outreach DM and Welcome email
   // here feed the Review / Onboard buttons. Managed on the Messages tab.
   const [messages, setMessages] = useState(DEFAULT_MESSAGES);
+  const [messagesDegraded, setMessagesDegraded] = useState(false);
   useEffect(() => {
-    fetch("/api/settings/messages").then((r) => r.json()).then((d) => { if (d.messages) setMessages(d.messages); }).catch(() => {});
+    fetch("/api/settings/messages").then((r) => r.json()).then((d) => {
+      if (d.messages) setMessages(d.messages);
+      setMessagesDegraded(Boolean(d.degraded));
+    }).catch(() => setMessagesDegraded(true));
   }, []);
   const dmFor = useCallback((first) => renderDm(messages["Outreach DM"], first), [messages]);
   const welcomeFor = useCallback((first) => renderDm(messages["Welcome email (postgrad)"], first), [messages]);
@@ -550,7 +554,7 @@ export default function AnaraCastingDesk() {
 
           {tab === "hq" && <HqTab team={team} user={user} track={track} onBusyChange={reportTabBusy} />}
 
-          {tab === "messages" && <MessagesTab messages={messages} onSaved={setMessages} user={user} copy={copy} copyRich={copyRich} copiedKey={copiedKey} />}
+          {tab === "messages" && <MessagesTab messages={messages} degraded={messagesDegraded} onSaved={setMessages} user={user} copy={copy} copyRich={copyRich} copiedKey={copiedKey} />}
 
 
           {tab === "onboard" && (
